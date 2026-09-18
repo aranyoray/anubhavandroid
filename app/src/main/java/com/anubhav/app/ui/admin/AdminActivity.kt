@@ -200,13 +200,27 @@ class AdminActivity : AppCompatActivity() {
             setBackgroundColor(ContextCompat.getColor(this@AdminActivity, R.color.card_background))
         }
         table.addView(tableRow(section.columns, header = true))
-        section.rows.forEach { table.addView(tableRow(it, header = false)) }
+        // Build a bounded number of rows: these tables are laid out synchronously on the main
+        // thread inside a non-recycling ScrollView, so drawing a whole detail section (up to
+        // hundreds of bills x six columns) at once would freeze a low-end phone. The server
+        // already caps the data; this caps what is materialised into Views.
+        val shown = section.rows.take(MAX_RENDER_ROWS)
+        shown.forEach { table.addView(tableRow(it, header = false)) }
 
         val scroller = android.widget.HorizontalScrollView(this).apply {
             isFillViewport = true
             addView(table)
         }
         wrap.addView(scroller)
+
+        if (section.rows.size > shown.size) {
+            wrap.addView(TextView(this).apply {
+                text = localized(R.string.admin_rows_truncated, shown.size, section.rows.size)
+                setTextColor(ContextCompat.getColor(this@AdminActivity, R.color.text_secondary))
+                textSize = 12f
+                setPadding(dp(2), dp(6), 0, 0)
+            })
+        }
 
         section.note?.let { note ->
             wrap.addView(TextView(this).apply {
@@ -248,6 +262,9 @@ class AdminActivity : AppCompatActivity() {
 
     companion object {
         const val EXTRA_PASSWORD = "admin_password"
+        // Cap the rows materialised into Views per section so a wide-range detail report
+        // cannot freeze a low-end phone; the count line still reports the true total.
+        private const val MAX_RENDER_ROWS = 150
         private const val MATCH = ViewGroup.LayoutParams.MATCH_PARENT
         private const val WRAP = ViewGroup.LayoutParams.WRAP_CONTENT
     }

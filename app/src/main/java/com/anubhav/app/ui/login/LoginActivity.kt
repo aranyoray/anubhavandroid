@@ -266,9 +266,13 @@ class LoginActivity : AppCompatActivity() {
             .setNegativeButton(localized(R.string.cancel), null)
             .create()
         dialog.setOnShowListener {
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            val unlock = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+            unlock.setOnClickListener {
                 val pw = input.text?.toString()?.trim().orEmpty()
                 if (pw.isEmpty()) return@setOnClickListener
+                // The dialog stays open during the network check, so disable the button to
+                // stop a double-tap from firing two checks and stacking two admin screens.
+                unlock.isEnabled = false
                 setLoading(true)
                 lifecycleScope.launch {
                     adminRepo.check(pw).fold(
@@ -281,6 +285,7 @@ class LoginActivity : AppCompatActivity() {
                                         .putExtra(AdminActivity.EXTRA_PASSWORD, pw),
                                 )
                             } else {
+                                unlock.isEnabled = true
                                 Toast.makeText(
                                     this@LoginActivity,
                                     localized(R.string.admin_wrong_password),
@@ -290,6 +295,7 @@ class LoginActivity : AppCompatActivity() {
                         },
                         onFailure = { err ->
                             setLoading(false)
+                            unlock.isEnabled = true
                             val message = if (err is retrofit2.HttpException && err.code() == 401) {
                                 localized(R.string.admin_wrong_password)
                             } else {

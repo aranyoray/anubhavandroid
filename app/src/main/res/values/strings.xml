@@ -654,4 +654,6 @@
     <string name="admin_empty_bn">তারিখ বেছে নিয়ে টেস্ট, আয়, সংগ্রহকেন্দ্র বা বকেয়ায় চাপ দিন।</string>
     <string name="admin_no_rows">No records in this range.</string>
     <string name="admin_no_rows_bn">এই সময়ের মধ্যে কোনো তথ্য নেই।</string>
+    <string name="admin_rows_truncated">Showing the first %1$d of %2$d rows. Narrow the date range to see the rest.</string>
+    <string name="admin_rows_truncated_bn">%2$d-টির মধ্যে প্রথম %1$d-টি দেখানো হচ্ছে। বাকিগুলো দেখতে তারিখের পরিসর ছোট করুন।</string>
 </resources>
