@@ -618,4 +618,36 @@
     <string name="verify_fill_two_fields_bn">অন্তত দুটি ঘর পূরণ করুন।</string>
     <string name="verify_no_match_bn">তথ্য মিলল না। নাম, বিল নম্বর/তারিখ আর ফোন নম্বর আরেকবার দেখে নিন।</string>
     <string name="verify_showing_reports_for_bn">%1$s-এর রিপোর্ট দেখানো হচ্ছে</string>
+
+    <!-- Admin booking-details section -->
+    <string name="admin_login">Admin</string>
+    <string name="admin_login_bn">অ্যাডমিন</string>
+    <string name="admin_password_hint">Admin password</string>
+    <string name="admin_password_hint_bn">অ্যাডমিন পাসওয়ার্ড</string>
+    <string name="admin_unlock">Unlock</string>
+    <string name="admin_unlock_bn">খুলুন</string>
+    <string name="admin_wrong_password">Wrong admin password</string>
+    <string name="admin_wrong_password_bn">অ্যাডমিন পাসওয়ার্ড ভুল</string>
+    <string name="admin_title">Booking Details</string>
+    <string name="admin_title_bn">বুকিং বিবরণ</string>
+    <string name="admin_from">From</string>
+    <string name="admin_from_bn">থেকে</string>
+    <string name="admin_to">To</string>
+    <string name="admin_to_bn">পর্যন্ত</string>
+    <string name="admin_bill_details">Bill Details</string>
+    <string name="admin_bill_details_bn">বিলের বিবরণ</string>
+    <string name="admin_test_details">Test Details</string>
+    <string name="admin_test_details_bn">টেস্টের বিবরণ</string>
+    <string name="admin_report_tests">Tests</string>
+    <string name="admin_report_tests_bn">টেস্ট</string>
+    <string name="admin_report_income">Income</string>
+    <string name="admin_report_income_bn">আয়</string>
+    <string name="admin_report_cc">CC</string>
+    <string name="admin_report_cc_bn">সংগ্রহকেন্দ্র</string>
+    <string name="admin_report_due">Due</string>
+    <string name="admin_report_due_bn">বকেয়া</string>
+    <string name="admin_empty">Pick a date range, then tap Tests, Income, CC or Due.</string>
+    <string name="admin_empty_bn">তারিখ বেছে নিয়ে টেস্ট, আয়, সংগ্রহকেন্দ্র বা বকেয়ায় চাপ দিন।</string>
+    <string name="admin_no_rows">No records in this range.</string>
+    <string name="admin_no_rows_bn">এই সময়ের মধ্যে কোনো তথ্য নেই।</string>
 </resources>

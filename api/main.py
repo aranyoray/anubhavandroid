@@ -20,8 +20,9 @@ from aktiv_booking import (
     search_doctors,
     search_tests,
 )
+from admin_reports import REPORTS, build_report
 from catalog import get_catalog
-from config import aktiv_settings
+from config import admin_password, aktiv_settings
 from customer_portal import (
     create_customer_prebooking,
     get_customer_profile,
@@ -409,6 +410,43 @@ def api_customer_prebook(body: CustomerPrebookRequest):
             latitude=body.latitude,
             longitude=body.longitude,
         )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise internal_error(exc) from exc
+
+
+# --- Admin (booking details) ---
+
+
+def _check_admin(password: str) -> None:
+    """The admin types the password at login; the server is the authority on it."""
+    if not password or password != admin_password():
+        raise HTTPException(status_code=401, detail="Wrong admin password")
+
+
+@app.get("/api/admin/check")
+def api_admin_check(password: str = ""):
+    """Cheap password gate the app calls before opening the Admin screen — no DB touched."""
+    _check_admin(password)
+    return {"ok": True}
+
+
+@app.get("/api/admin/report")
+def api_admin_report(
+    password: str = "",
+    report: str = "income",
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    bill_details: bool = True,
+    test_details: bool = True,
+):
+    """Booking-details report (tests | income | cc | due) over a date range, admin only."""
+    _check_admin(password)
+    if report not in REPORTS:
+        raise HTTPException(status_code=400, detail=f"report must be one of {', '.join(REPORTS)}")
+    try:
+        return build_report(report, start, end, bill_details, test_details)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:

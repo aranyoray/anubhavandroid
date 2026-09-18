@@ -46,6 +46,10 @@ object AktivApiClient {
         retrofit.create(CatalogApi::class.java)
     }
 
+    val adminApi: AdminApi by lazy {
+        retrofit.create(AdminApi::class.java)
+    }
+
     // One Retrofit for every interface: three separate instances each built their
     // own converter and call adapters for no benefit.
     private val retrofit: Retrofit by lazy { buildRetrofit() }
