@@ -196,12 +196,8 @@ class MainActivity : AppCompatActivity(), PaymentResultListener {
     }
 
     private fun updateLanguageButton() {
-        binding.appBarMain.languageToggleBtn.text =
-            if (languageManager.isBengali()) {
-                getString(R.string.language_english)
-            } else {
-                getString(R.string.language_bengali)
-            }
+        // "বাং/ইং" in Bengali mode, "EN/BN" in English mode — localized() picks the _bn form.
+        binding.appBarMain.languageToggleBtn.text = localized(R.string.language_toggle)
     }
 
     private fun navController(): NavController {

@@ -61,6 +61,10 @@
     <string name="continue_btn">Continue</string>
     <string name="language_english">A</string>
     <string name="language_bengali">অ</string>
+    <!-- Top-bar language toggle. localized() shows the _bn form in Bengali mode ("বাং/ইং")
+         and this English form ("EN/BN") in English mode. -->
+    <string name="language_toggle">EN/BN</string>
+    <string name="language_toggle_bn">বাং/ইং</string>
     <string name="switch_to_english">Switch to English</string>
     <string name="switch_to_bengali">Switch to Bengali</string>
     <string name="settings_language_title">App language</string>

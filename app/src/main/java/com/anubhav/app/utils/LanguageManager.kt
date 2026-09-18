@@ -19,7 +19,10 @@ class LanguageManager(private val context: Context) {
         sharedPrefs.contains(KEY_LANGUAGE)
 
     fun getCurrentLanguage(): String {
-        return sharedPrefs.getString(KEY_LANGUAGE, LANGUAGE_ENGLISH) ?: LANGUAGE_ENGLISH
+        // Bengali is the default: most of the clinic's patients read Bengali first, and the
+        // top-bar toggle lets anyone switch to English. Users who have already chosen keep
+        // their choice (KEY_LANGUAGE is set for them).
+        return sharedPrefs.getString(KEY_LANGUAGE, LANGUAGE_BENGALI) ?: LANGUAGE_BENGALI
     }
 
     fun setLanguage(language: String) {
