@@ -88,7 +88,7 @@ class MyBookingsFragment : Fragment() {
                     progress.visibility = View.GONE
                     tvEmpty.visibility = View.VISIBLE
                     tvEmpty.text = localized(R.string.network_error)
-                    Toast.makeText(requireContext(), it.message, Toast.LENGTH_LONG).show()
+                    Toast.makeText(requireContext(), it.message ?: localized(R.string.network_error), Toast.LENGTH_LONG).show()
                 },
             )
         }

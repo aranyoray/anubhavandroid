@@ -28,7 +28,7 @@ object CollectorLogSharer {
         val file = File(dir, "collector_patient_log.csv")
         file.writeText(
             buildString {
-        appendLine("Patient,Phone,Age,Sex,Referred By,Follow-up Status,Notes,Sync Status,Created At")
+                appendLine("Patient,Phone,Age,Sex,Referred By,Follow-up Status,Notes,Sync Status,Created At")
                 patients.forEach { patient ->
                     appendCsv(patient.patientName)
                     append(',')
@@ -38,12 +38,12 @@ object CollectorLogSharer {
                     append(',')
                     appendCsv(patient.sex.orEmpty())
                     append(',')
-            appendCsv(patient.referredBy.orEmpty())
-            append(',')
-            appendCsv(patient.followupStatus.orEmpty())
-            append(',')
-            appendCsv(patient.notes.orEmpty())
-            append(',')
+                    appendCsv(patient.referredBy.orEmpty())
+                    append(',')
+                    appendCsv(patient.followupStatus.orEmpty())
+                    append(',')
+                    appendCsv(patient.notes.orEmpty())
+                    append(',')
                     appendCsv(if ((patient.id ?: 0) < 0) "Saved on phone" else "Synced")
                     append(',')
                     appendCsv(patient.createdAt.orEmpty())

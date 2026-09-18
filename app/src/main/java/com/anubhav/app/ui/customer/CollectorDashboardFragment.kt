@@ -60,10 +60,10 @@ class CollectorDashboardFragment : Fragment() {
         val name = view.findViewById<TextInputEditText>(R.id.etCollectorPatientName)
         val phone = view.findViewById<TextInputEditText>(R.id.etCollectorPhone)
         val age = view.findViewById<TextInputEditText>(R.id.etCollectorAge)
-val sex = view.findViewById<TextInputEditText>(R.id.etCollectorSex)
-val referredBy = view.findViewById<TextInputEditText>(R.id.etCollectorReferredBy)
-val followupStatus = view.findViewById<TextInputEditText>(R.id.etCollectorFollowupStatus)
-val notes = view.findViewById<TextInputEditText>(R.id.etCollectorNotes)
+        val sex = view.findViewById<TextInputEditText>(R.id.etCollectorSex)
+        val referredBy = view.findViewById<TextInputEditText>(R.id.etCollectorReferredBy)
+        val followupStatus = view.findViewById<TextInputEditText>(R.id.etCollectorFollowupStatus)
+        val notes = view.findViewById<TextInputEditText>(R.id.etCollectorNotes)
         val patientSearch = view.findViewById<TextInputEditText>(R.id.etCollectorPatientSearch)
         val reportSearch = view.findViewById<TextInputEditText>(R.id.etCollectorReportSearch)
 
@@ -116,15 +116,15 @@ val notes = view.findViewById<TextInputEditText>(R.id.etCollectorNotes)
                 patientName = cleanName,
                 phone = cleanPhone,
                 ageYear = age.text?.toString()?.toIntOrNull(),
-sex = sex.text?.toString()?.trim()?.ifBlank { null },
-referredBy = referredBy.text?.toString()?.trim()?.ifBlank { null },
-notes = notes.text?.toString()?.trim()?.ifBlank { null },
-followupStatus = followupStatus.text?.toString()?.trim()?.ifBlank { null },
-)
-savePatient(request, progress, empty) {
-listOf(name, phone, age, sex, referredBy, followupStatus, notes).forEach { it.text?.clear() }
-loadCollectorData(collectorKey, progress, empty, syncState, forceRefresh = false)
-}
+                sex = sex.text?.toString()?.trim()?.ifBlank { null },
+                referredBy = referredBy.text?.toString()?.trim()?.ifBlank { null },
+                notes = notes.text?.toString()?.trim()?.ifBlank { null },
+                followupStatus = followupStatus.text?.toString()?.trim()?.ifBlank { null },
+            )
+            savePatient(request, progress, empty) {
+                listOf(name, phone, age, sex, referredBy, followupStatus, notes).forEach { it.text?.clear() }
+                loadCollectorData(collectorKey, progress, empty, syncState, forceRefresh = false)
+            }
         }
 
         btnRefresh.setOnClickListener {
@@ -309,8 +309,8 @@ private class CollectorPatientAdapter(
             allItems
         } else {
             allItems.filter {
-listOf(it.patientName, it.phone, it.sex, it.referredBy, it.followupStatus, it.notes, it.createdAt)
-.joinToString(" ")
+                listOf(it.patientName, it.phone, it.sex, it.referredBy, it.followupStatus, it.notes, it.createdAt)
+                    .joinToString(" ")
                     .lowercase()
                     .contains(needle)
             }
@@ -357,13 +357,13 @@ listOf(it.patientName, it.phone, it.sex, it.referredBy, it.followupStatus, it.no
             append(item.patientName).append(" | ").append(item.phone)
             item.ageYear?.let { append('\n').append(holder.text.context.localized(R.string.collector_age_value, it)) }
             item.sex?.takeIf { it.isNotBlank() }?.let { append(" | ").append(it) }
-item.referredBy?.takeIf { it.isNotBlank() }?.let {
-append('\n').append(holder.text.context.localized(R.string.collector_referred_value, it))
-}
-item.followupStatus?.takeIf { it.isNotBlank() }?.let {
-append('\n').append(holder.text.context.localized(R.string.collector_status_value, it))
-}
-item.notes?.takeIf { it.isNotBlank() }?.let { append('\n').append(it) }
+            item.referredBy?.takeIf { it.isNotBlank() }?.let {
+                append('\n').append(holder.text.context.localized(R.string.collector_referred_value, it))
+            }
+            item.followupStatus?.takeIf { it.isNotBlank() }?.let {
+                append('\n').append(holder.text.context.localized(R.string.collector_status_value, it))
+            }
+            item.notes?.takeIf { it.isNotBlank() }?.let { append('\n').append(it) }
             if ((item.id ?: 0) < 0) append('\n').append(holder.text.context.localized(R.string.saved_on_phone))
         }
         holder.call.setOnClickListener { onCall(item) }

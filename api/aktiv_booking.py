@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any
 
-from db import fetch_all, fetch_one, mssql_conn, neon_conn
+from db import fetch_all, mssql_conn, neon_conn
 from config import aktiv_settings
 
 DEFAULT_COLL_CENTRE_KEY = 1  # ANUBHAV LIFE CARE
@@ -149,25 +149,28 @@ def _year_prefix(d: date) -> str:
     return f"{d.year % 100:02d}"
 
 
-def next_bill_number(bill_date: date | None = None) -> dict[str, str]:
-    """Next sequential bill number for the month (resets to 001 on the 1st)."""
-    bill_date = bill_date or date.today()
+def _next_bill_number_on(cur, bill_date: date) -> dict[str, str]:
+    """Next sequential ALC bill number for the month, read from the live AKTIV database.
+
+    Serials reset to 001 on the 1st. The front desk writes bills all day, so the
+    Neon mirror (refreshed by the ETL in batches) is stale for numbering: reading
+    it here handed out serials the desktop had already used since the last sync.
+    The UPDLOCK/HOLDLOCK hints make two concurrent bookings queue on the same
+    month instead of both computing the same "next" number.
+    """
     prefix1 = _bill_prefix1(bill_date)
-
-    with neon_conn() as conn, conn.cursor() as cur:
-        row = fetch_one(
-            cur,
-            """
-            SELECT MAX(CAST(bill_number AS INTEGER)) AS max_no
-            FROM bill_head
-            WHERE bill_prefix1 = %s AND bill_prefix2 = %s
-              AND bill_number ~ '^[0-9]+$'
-            """,
-            (prefix1, BILL_PREFIX2),
-        )
-        max_no = int(row["max_no"] or 0)
-        next_no = max_no + 1
-
+    cur.execute(
+        """
+        SELECT ISNULL(MAX(CAST(bill_number AS INT)), 0)
+        FROM BILL_HEAD WITH (UPDLOCK, HOLDLOCK)
+        WHERE bill_prefix1 = %s AND bill_prefix2 = %s
+          AND LTRIM(RTRIM(ISNULL(bill_number, ''))) <> ''
+          AND bill_number NOT LIKE '%[^0-9]%'
+        """,
+        (prefix1, BILL_PREFIX2),
+    )
+    row = cur.fetchone()
+    next_no = int((row[0] if row else 0) or 0) + 1
     bill_number = f"{next_no:03d}"
     return {
         "bill_prefix1": prefix1,
@@ -175,6 +178,13 @@ def next_bill_number(bill_date: date | None = None) -> dict[str, str]:
         "bill_number": bill_number,
         "bill_no": f"{prefix1}/{BILL_PREFIX2}/{bill_number}",
     }
+
+
+def next_bill_number(bill_date: date | None = None) -> dict[str, str]:
+    """Preview of the next bill number for the month (see `_next_bill_number_on`)."""
+    bill_date = bill_date or date.today()
+    with mssql_conn() as conn, conn.cursor() as cur:
+        return _next_bill_number_on(cur, bill_date)
 
 
 def search_tests(query: str = "", limit: int = 50) -> list[dict[str, Any]]:
@@ -291,7 +301,8 @@ def _resolve_tests(test_keys: list[int]) -> list[TestLine]:
 
 
 def _next_key(cur, table: str, column: str) -> int:
-    cur.execute(f"SELECT ISNULL(MAX({column}), 0) + 1 FROM {table}")
+    """MAX+1 key allocation, locked so two bookings in flight cannot pick the same key."""
+    cur.execute(f"SELECT ISNULL(MAX({column}), 0) + 1 FROM {table} WITH (UPDLOCK, HOLDLOCK)")
     row = cur.fetchone()
     return int(row[0])
 
@@ -425,15 +436,17 @@ def push_booking(
     if receipt_mode.upper() != "UPI":
         cheque_no = None
 
-    bill_info = next_bill_number(bill_date)
-    if bill_number:
-        bill_info["bill_number"] = bill_number.zfill(3)
-        bill_info["bill_no"] = (
-            f"{bill_info['bill_prefix1']}/{bill_info['bill_prefix2']}/{bill_info['bill_number']}"
-        )
-
     with mssql_conn() as conn:
         cur = conn.cursor()
+
+        # Allocated inside the transaction, from the live table, so the serial reflects
+        # every bill the desktop has written up to this moment.
+        bill_info = _next_bill_number_on(cur, bill_date)
+        if bill_number:
+            bill_info["bill_number"] = bill_number.zfill(3)
+            bill_info["bill_no"] = (
+                f"{bill_info['bill_prefix1']}/{bill_info['bill_prefix2']}/{bill_info['bill_number']}"
+            )
 
         regt_key, regt_no = _find_or_create_patient(
             cur,

@@ -345,13 +345,13 @@ class LoginActivity : AppCompatActivity() {
             showInlineError(localized(R.string.invalid_email))
             return
         }
-    if (password.length < 6) {
-        showInlineError(localized(R.string.invalid_password))
-        return
-    }
+        if (password.length < 6) {
+            showInlineError(localized(R.string.invalid_password))
+            return
+        }
 
-    setLoading(true)
-    lifecycleScope.launch {
+        setLoading(true)
+        lifecycleScope.launch {
             try {
                 val result = if (isSignUpMode) {
                     auth.createUserWithEmailAndPassword(email, password).await()
@@ -363,7 +363,7 @@ class LoginActivity : AppCompatActivity() {
                 setLoading(false)
                 showInlineError(e.localizedMessage ?: localized(if (isSignUpMode) R.string.sign_up_failed else R.string.login_failed))
             }
-    }
+        }
     }
 
     private fun signInWithGoogleToken(idToken: String) {

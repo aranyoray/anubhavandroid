@@ -45,6 +45,8 @@ logger = logging.getLogger(__name__)
 def internal_error(exc: Exception) -> HTTPException:
     logger.exception("Unhandled API error")
     return HTTPException(status_code=500, detail="Internal server error")
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -383,7 +385,10 @@ def api_customer_pending(phone: str):
 
 @app.get("/api/customer/prebook/calendar")
 def api_prebook_calendar(months_ahead: int = 3):
-    return get_prebook_calendar(months_ahead=min(months_ahead, 6))
+    try:
+        return get_prebook_calendar(months_ahead=max(1, min(months_ahead, 6)))
+    except Exception as exc:
+        raise internal_error(exc) from exc
 
 
 @app.post("/api/customer/prebook")

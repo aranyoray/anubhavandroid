@@ -47,7 +47,9 @@ def authenticate(userid: str, password: str) -> AuthUser:
 
     user_key, db_userid, username, db_password = row
     stored = "" if db_password is None else str(db_password)
-    if not hmac.compare_digest(stored, password):
+    # compare_digest wants ASCII str or bytes; AKTIV passwords are free text, so
+    # compare the UTF-8 bytes and never raise on a non-ASCII character.
+    if not hmac.compare_digest(stored.encode("utf-8"), password.encode("utf-8")):
         raise ValueError("Invalid username or password")
 
     role = _user_role(str(db_userid or login_id), str(username) if username else None)
