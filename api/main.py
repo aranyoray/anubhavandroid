@@ -2,10 +2,11 @@
 from __future__ import annotations
 
 import logging
+import secrets
 from datetime import date
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -420,29 +421,36 @@ def api_customer_prebook(body: CustomerPrebookRequest):
 
 
 def _check_admin(password: str) -> None:
-    """The admin types the password at login; the server is the authority on it."""
-    if not password or password != admin_password():
+    """The admin types the password at login; the server is the authority on it.
+
+    Read from a request header, never the query string, so the credential does not land
+    in web-server access logs. Compared in constant time to avoid a timing side-channel.
+    """
+    expected = admin_password()
+    if not password or not secrets.compare_digest(
+        password.encode("utf-8"), expected.encode("utf-8")
+    ):
         raise HTTPException(status_code=401, detail="Wrong admin password")
 
 
 @app.get("/api/admin/check")
-def api_admin_check(password: str = ""):
+def api_admin_check(x_admin_password: str = Header("", alias="X-Admin-Password")):
     """Cheap password gate the app calls before opening the Admin screen — no DB touched."""
-    _check_admin(password)
+    _check_admin(x_admin_password)
     return {"ok": True}
 
 
 @app.get("/api/admin/report")
 def api_admin_report(
-    password: str = "",
     report: str = "income",
     start: Optional[str] = None,
     end: Optional[str] = None,
     bill_details: bool = True,
     test_details: bool = True,
+    x_admin_password: str = Header("", alias="X-Admin-Password"),
 ):
     """Booking-details report (tests | income | cc | due) over a date range, admin only."""
-    _check_admin(password)
+    _check_admin(x_admin_password)
     if report not in REPORTS:
         raise HTTPException(status_code=400, detail=f"report must be one of {', '.join(REPORTS)}")
     try:

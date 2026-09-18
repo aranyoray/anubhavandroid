@@ -181,12 +181,28 @@ class EndpointTests(unittest.TestCase):
 
     def test_check_rejects_wrong_password(self):
         with patch.object(main, "admin_password", return_value="nabllab"):
-            self.assertEqual(self.client.get("/api/admin/check", params={"password": "x"}).status_code, 401)
-            self.assertEqual(self.client.get("/api/admin/check", params={"password": "nabllab"}).status_code, 200)
+            self.assertEqual(
+                self.client.get("/api/admin/check", headers={"X-Admin-Password": "x"}).status_code, 401
+            )
+            self.assertEqual(
+                self.client.get("/api/admin/check", headers={"X-Admin-Password": "nabllab"}).status_code, 200
+            )
+
+    def test_check_rejects_missing_password_header(self):
+        with patch.object(main, "admin_password", return_value="nabllab"):
+            self.assertEqual(self.client.get("/api/admin/check").status_code, 401)
+
+    def test_password_is_not_in_the_query_string(self):
+        # It must travel as a header so it never reaches web-server access logs.
+        with patch.object(main, "admin_password", return_value="nabllab"):
+            r = self.client.get("/api/admin/check", params={"password": "nabllab"})
+        self.assertEqual(r.status_code, 401)
 
     def test_report_requires_password(self):
         with patch.object(main, "admin_password", return_value="nabllab"):
-            r = self.client.get("/api/admin/report", params={"password": "wrong", "report": "income"})
+            r = self.client.get(
+                "/api/admin/report", params={"report": "income"}, headers={"X-Admin-Password": "wrong"}
+            )
         self.assertEqual(r.status_code, 401)
 
     def test_report_passes_flags_through(self):
@@ -195,15 +211,18 @@ class EndpointTests(unittest.TestCase):
                 patch.object(main, "build_report", return_value=expected) as build:
             r = self.client.get(
                 "/api/admin/report",
-                params={"password": "nabllab", "report": "tests", "start": "2026-09-01",
+                params={"report": "tests", "start": "2026-09-01",
                         "end": "2026-09-18", "bill_details": "false", "test_details": "true"},
+                headers={"X-Admin-Password": "nabllab"},
             )
         self.assertEqual(r.status_code, 200)
         build.assert_called_once_with("tests", "2026-09-01", "2026-09-18", False, True)
 
     def test_report_rejects_unknown_type(self):
         with patch.object(main, "admin_password", return_value="nabllab"):
-            r = self.client.get("/api/admin/report", params={"password": "nabllab", "report": "bogus"})
+            r = self.client.get(
+                "/api/admin/report", params={"report": "bogus"}, headers={"X-Admin-Password": "nabllab"}
+            )
         self.assertEqual(r.status_code, 400)
 
     def test_admin_password_default_is_the_shared_value(self):
