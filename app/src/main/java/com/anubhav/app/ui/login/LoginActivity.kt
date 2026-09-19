@@ -78,8 +78,13 @@ class LoginActivity : AppCompatActivity() {
             }
             signInWithGoogleToken(idToken)
         } catch (e: ApiException) {
-            if (e.statusCode != 12501) {
-                showInlineError(e.localizedMessage ?: localized(R.string.login_failed))
+            // 12501 = user cancelled the chooser; 10 = DEVELOPER_ERROR, i.e. this build's
+            // SHA-1/package is not registered in the Firebase project, so no code change makes
+            // Google work here - point the user at a login that does.
+            when (e.statusCode) {
+                12501 -> Unit
+                10 -> showInlineError(localized(R.string.google_signin_misconfigured))
+                else -> showInlineError(e.localizedMessage ?: localized(R.string.login_failed))
             }
         }
     }
@@ -189,7 +194,11 @@ class LoginActivity : AppCompatActivity() {
             googleLauncher.launch(googleSignInClient.signInIntent)
         }
 
-        findViewById<MaterialButton>(R.id.btnFacebook).setOnClickListener {
+        val btnFacebook = findViewById<MaterialButton>(R.id.btnFacebook)
+        // A button that only ever shows "not configured" is worse than no button. Hide it until
+        // the real Facebook app id / client token replace the REPLACE_WITH_ placeholders.
+        btnFacebook.visibility = if (isFacebookConfigured()) View.VISIBLE else View.GONE
+        btnFacebook.setOnClickListener {
             setLoading(true)
             hideInlineError()
             if (!isFacebookConfigured()) {

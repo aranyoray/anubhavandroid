@@ -100,6 +100,11 @@ jobs:
         env:
           RAZORPAY_KEY_ID: ${{ secrets.RAZORPAY_KEY_ID }}
           AKTIV_API_URL: ${{ vars.AKTIV_API_URL }}
+          # Shared customer-API key; without it the deployed API answers 401 and the clinic
+          # "Continue with phone" login fails. Header name defaults to X-ALC-Key in gradle;
+          # override it with the AKTIV_API_KEY_HEADER variable if the server expects another.
+          AKTIV_API_KEY: ${{ secrets.AKTIV_API_KEY }}
+          AKTIV_API_KEY_HEADER: ${{ vars.AKTIV_API_KEY_HEADER }}
         run: |
           chmod +x gradlew
           ./gradlew --no-daemon assembleRelease

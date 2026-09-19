@@ -52,6 +52,7 @@
     <string name="facebook_app_id">REPLACE_WITH_FACEBOOK_APP_ID</string>
     <string name="fb_login_protocol_scheme">fbreplace_with_facebook_app_id</string>
     <string name="facebook_client_token">REPLACE_WITH_FACEBOOK_CLIENT_TOKEN</string>
+    <string name="google_signin_misconfigured">Google sign-in isn\'t set up for this build. Use \"Continue with phone\" or email instead.</string>
 
     <!-- Language selection -->
     <string name="choose_language_title">Choose your language</string>

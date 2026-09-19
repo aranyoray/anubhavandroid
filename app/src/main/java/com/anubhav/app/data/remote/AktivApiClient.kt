@@ -30,6 +30,21 @@ object AktivApiClient {
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)
             .writeTimeout(60, TimeUnit.SECONDS)
+            // The deployed customer API rejects unkeyed requests with 401 "Invalid or missing
+            // API key". Attach the build-time key on every request; when it is blank (dev
+            // builds, on-LAN API with no gate) no header is added and behaviour is unchanged.
+            .addInterceptor { chain ->
+                val key = BuildConfig.AKTIV_API_KEY
+                val headerName = BuildConfig.AKTIV_API_KEY_HEADER
+                val request = if (key.isNotBlank() && headerName.isNotBlank()) {
+                    chain.request().newBuilder()
+                        .header(headerName, key)
+                        .build()
+                } else {
+                    chain.request()
+                }
+                chain.proceed(request)
+            }
             .addInterceptor(logging)
             .build()
     }
