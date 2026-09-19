@@ -1,0 +1,160 @@
+name: Build APK
+
+# Builds the AKTIV Admin (anubhavandroid) app on GitHub's runners and publishes an
+# installable APK, mirroring the alc-marketing pipeline.
+#
+#  * every push / manual run  -> APK uploaded as a workflow artifact (Actions -> run -> Artifacts)
+#  * main / claude/* branches -> a rolling "apk-latest" pre-release is kept current, so there is
+#                                always one public APK download link on the Releases page
+#  * pushing a tag like v1.0  -> a permanent versioned Release is created with the APK attached
+#
+# SIGNING. The app's release build is only signed when a keystore is present; an unsigned APK
+# will not install on a phone. So this workflow always establishes a signing key:
+#   * If the ANDROID_KEYSTORE_BASE64 secret is set, it (plus KEYSTORE_PASSWORD / KEY_ALIAS /
+#     KEY_PASSWORD) is used - a STABLE key, so new builds install over old ones.
+#   * If it is not set, an EPHEMERAL key is generated for this run only, so the build still
+#     produces an installable APK. Because that key changes every run, a phone must uninstall
+#     the previous build before installing a new ephemeral-signed one. Add the secret to get
+#     upgrade-in-place installs. See the release notes each build prints which mode was used.
+#
+# Optional build inputs (repository secrets or variables), all with safe defaults:
+#   RAZORPAY_KEY_ID  - baked into BuildConfig; empty is fine for a non-payment build.
+#   AKTIV_API_URL    - defaults to https://api.anubhavlifecare.in/ (the Cloudflare tunnel).
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# One build per branch at a time; a newer push cancels an in-flight older one so two builds of
+# the same branch never race to replace the single rolling-release asset.
+concurrency:
+  group: apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # packages:'' - the action defaults to installing the withdrawn "tools" package, which
+      # makes sdkmanager exit 1 before the build starts. The two packages this build needs are
+      # installed by hand below; platform-tools is already on the runner image.
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: ''
+
+      - name: Install SDK packages
+        run: |
+          yes | sdkmanager "platforms;android-36" "build-tools;36.0.0" >/dev/null
+          yes | sdkmanager --licenses >/dev/null || true
+
+      - name: Establish signing key
+        id: sign
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -n "${KEYSTORE_B64:-}" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > release.jks
+            store_pw="${KEYSTORE_PASSWORD}"
+            alias="${KEY_ALIAS}"
+            key_pw="${KEY_PASSWORD:-$KEYSTORE_PASSWORD}"
+            echo "mode=stable" >> "$GITHUB_OUTPUT"
+          else
+            echo "No ANDROID_KEYSTORE_BASE64 secret - generating an ephemeral key for this run."
+            store_pw="ephemeral"
+            alias="ephemeral"
+            key_pw="ephemeral"
+            keytool -genkeypair -v \
+              -keystore release.jks -storetype JKS \
+              -alias "$alias" -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass "$store_pw" -keypass "$key_pw" \
+              -dname "CN=Anubhav Life Care, OU=CI, O=Anubhav Life Care, L=Kolkata, S=WB, C=IN"
+            echo "mode=ephemeral" >> "$GITHUB_OUTPUT"
+          fi
+          # gradle resolves storeFile with rootProject.file(...), so a root-relative name works.
+          {
+            echo "storeFile=release.jks"
+            echo "storePassword=$store_pw"
+            echo "keyAlias=$alias"
+            echo "keyPassword=$key_pw"
+          } > keystore.properties
+
+      - name: Build release APK
+        env:
+          RAZORPAY_KEY_ID: ${{ secrets.RAZORPAY_KEY_ID }}
+          AKTIV_API_URL: ${{ vars.AKTIV_API_URL }}
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleRelease
+
+      - name: Name the APK
+        id: apk
+        run: |
+          src="app/build/outputs/apk/release/app-release.apk"
+          test -f "$src" || { echo "release APK not found at $src"; ls -R app/build/outputs/apk || true; exit 1; }
+          short="$(git rev-parse --short HEAD)"
+          if [ "${{ startsWith(github.ref, 'refs/tags/') }}" = "true" ]; then
+            out="anubhav-${{ github.ref_name }}.apk"
+          else
+            out="anubhav-latest.apk"
+          fi
+          cp "$src" "$out"
+          echo "path=$out" >> "$GITHUB_OUTPUT"
+          echo "short=$short" >> "$GITHUB_OUTPUT"
+          echo "subject=$(git log -1 --pretty=%s)" >> "$GITHUB_OUTPUT"
+          echo "built=$(date -u '+%d %b %Y %H:%M UTC')" >> "$GITHUB_OUTPUT"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: anubhav-apk
+          path: ${{ steps.apk.outputs.path }}
+          if-no-files-found: error
+
+      # The rolling release must hold exactly one APK; uploading only ever adds, so old assets
+      # are cleared first or the newest becomes just one more line in a list of look-alikes.
+      - name: Clear old APKs off the rolling release
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/claude/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view apk-latest --json assets -q '.assets[].name' 2>/dev/null \
+            | while read -r name; do
+                [ -n "$name" ] && gh release delete-asset apk-latest "$name" --yes || true
+              done
+
+      - name: Publish APK to a GitHub Release
+        if: >
+          startsWith(github.ref, 'refs/tags/') ||
+          github.ref == 'refs/heads/main' ||
+          startsWith(github.ref, 'refs/heads/claude/')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'apk-latest' }}
+          name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'Latest APK (auto-built)' }}
+          prerelease: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          body: |
+            **${{ steps.apk.outputs.subject }}**
+
+            * Build `${{ steps.apk.outputs.short }}`, ${{ steps.apk.outputs.built }}
+            * Signing: **${{ steps.sign.outputs.mode }}** ( `ephemeral` = uninstall the old build before installing; add the `ANDROID_KEYSTORE_BASE64` secret for upgrade-in-place ).
+            * Download the single `.apk` below and install it (allow "install from unknown sources").
+          files: ${{ steps.apk.outputs.path }}
+          fail_on_unmatched_files: true
