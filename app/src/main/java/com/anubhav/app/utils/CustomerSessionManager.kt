@@ -27,6 +27,7 @@ object CustomerSessionManager {
             .putString(KEY_FIREBASE_UID, firebaseUid)
             .putString(KEY_ROLE, role)
             .apply()
+        PatientTokens.sessionPhone = phone
     }
 
     fun isLoggedIn(context: Context): Boolean = !getFirebaseUid(context).isNullOrBlank()
@@ -73,5 +74,7 @@ object CustomerSessionManager {
 
     fun clear(context: Context) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().clear().apply()
+        PatientTokens.clear()
+        PatientTokens.sessionPhone = null
     }
 }

@@ -26,6 +26,7 @@ import com.anubhav.app.data.repository.CustomerRepository
 import com.anubhav.app.ui.admin.AdminActivity
 import com.anubhav.app.utils.CustomerSessionManager
 import com.anubhav.app.utils.LanguageManager
+import com.anubhav.app.utils.PatientTokens
 import com.anubhav.app.utils.localized
 import com.facebook.CallbackManager
 import com.facebook.FacebookCallback
@@ -253,12 +254,17 @@ class LoginActivity : AppCompatActivity() {
     }
 
     /**
-     * Admin booking-details gate. The password is verified against the server (the authority
-     * on it) before the admin screen opens; it is never stored on the phone.
+     * Staff sign-in with the same AKTIV user id + password as the desktop. The server
+     * checks them against AKTIV and returns the user's rights, so the Admin screen offers
+     * exactly what that user may do in AKTIV (some only book, some also edit or cancel).
      */
     private fun showAdminDialog() {
         hideInlineError()
-        val input = EditText(this).apply {
+        val etUser = EditText(this).apply {
+            hint = localized(R.string.admin_userid_hint)
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+        }
+        val etPass = EditText(this).apply {
             hint = localized(R.string.admin_password_hint)
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
         }
@@ -266,49 +272,39 @@ class LoginActivity : AppCompatActivity() {
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(pad + pad / 4, pad / 2, pad + pad / 4, 0)
-            addView(input)
+            addView(etUser)
+            addView(etPass)
         }
         val dialog = AlertDialog.Builder(this)
-            .setTitle(localized(R.string.admin_login))
+            .setTitle(localized(R.string.admin_signin_title))
             .setView(container)
             .setPositiveButton(localized(R.string.admin_unlock), null)
             .setNegativeButton(localized(R.string.cancel), null)
             .create()
         dialog.setOnShowListener {
-            val unlock = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-            unlock.setOnClickListener {
-                val pw = input.text?.toString()?.trim().orEmpty()
-                if (pw.isEmpty()) return@setOnClickListener
+            val signIn = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+            signIn.setOnClickListener {
+                val user = etUser.text?.toString()?.trim().orEmpty()
+                val pw = etPass.text?.toString().orEmpty()
+                if (user.isEmpty() || pw.isEmpty()) return@setOnClickListener
                 // The dialog stays open during the network check, so disable the button to
-                // stop a double-tap from firing two checks and stacking two admin screens.
-                unlock.isEnabled = false
+                // stop a double-tap from firing two sign-ins and stacking two admin screens.
+                signIn.isEnabled = false
                 setLoading(true)
                 lifecycleScope.launch {
-                    adminRepo.check(pw).fold(
-                        onSuccess = { ok ->
+                    adminRepo.signIn(user, pw).fold(
+                        onSuccess = {
                             setLoading(false)
-                            if (ok) {
-                                dialog.dismiss()
-                                startActivity(
-                                    Intent(this@LoginActivity, AdminActivity::class.java)
-                                        .putExtra(AdminActivity.EXTRA_PASSWORD, pw),
-                                )
-                            } else {
-                                unlock.isEnabled = true
-                                Toast.makeText(
-                                    this@LoginActivity,
-                                    localized(R.string.admin_wrong_password),
-                                    Toast.LENGTH_LONG,
-                                ).show()
-                            }
+                            dialog.dismiss()
+                            startActivity(Intent(this@LoginActivity, AdminActivity::class.java))
                         },
                         onFailure = { err ->
                             setLoading(false)
-                            unlock.isEnabled = true
-                            val message = if (err is retrofit2.HttpException && err.code() == 401) {
+                            signIn.isEnabled = true
+                            val message = if (AdminRepository.statusOf(err) == 401) {
                                 localized(R.string.admin_wrong_password)
                             } else {
-                                err.localizedMessage ?: localized(R.string.network_error)
+                                localized(R.string.network_error)
                             }
                             Toast.makeText(this@LoginActivity, message, Toast.LENGTH_LONG).show()
                         },
@@ -345,7 +341,8 @@ class LoginActivity : AppCompatActivity() {
             hint = localized(R.string.verify_phone_hint); inputType = InputType.TYPE_CLASS_PHONE; setText(prefillPhone)
         }
         val etBill = EditText(this).apply {
-            hint = localized(R.string.verify_bill_no_hint); inputType = InputType.TYPE_CLASS_NUMBER
+            // Text, not number: patients copy "2026/09/ALC/4171" off the receipt as often as "4171".
+            hint = localized(R.string.verify_bill_no_hint); inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
         }
         var billDateIso: String? = null
         val dateBtn = com.google.android.material.button.MaterialButton(this).apply {
@@ -391,6 +388,7 @@ class LoginActivity : AppCompatActivity() {
                         onSuccess = { r ->
                             setLoading(false)
                             if (r.matched && r.phone.isNotBlank()) {
+                                PatientTokens.save(r.phone, r.token)
                                 CustomerSessionManager.save(
                                     this@LoginActivity,
                                     phone = r.phone,
@@ -569,6 +567,7 @@ class LoginActivity : AppCompatActivity() {
         )
         findViewById<TextView>(R.id.tvChangeLanguage).text =
             "${localized(R.string.action_settings)} · ${localized(R.string.settings_language_title)}"
+        findViewById<TextView>(R.id.tvAdminLogin).text = localized(R.string.admin_login)
         findViewById<com.google.android.material.textfield.TextInputLayout>(R.id.layoutEmail).hint =
             localized(R.string.email)
         findViewById<com.google.android.material.textfield.TextInputLayout>(R.id.layoutPassword).hint =

@@ -22,6 +22,7 @@ import com.anubhav.app.R
 import com.anubhav.app.data.model.CustomerVisit
 import com.anubhav.app.data.repository.CustomerRepository
 import com.anubhav.app.utils.CustomerSessionManager
+import com.anubhav.app.utils.PatientTokens
 import com.anubhav.app.utils.ReportFetcher
 import com.anubhav.app.utils.localized
 import kotlinx.coroutines.launch
@@ -39,6 +40,8 @@ class MyReportsFragment : Fragment() {
     private lateinit var root: LinearLayout
     private lateinit var listContainer: LinearLayout
     private lateinit var statusView: TextView
+    /** The phone whose visits are on screen (the patient's own, or one verified via "Fetch another"). */
+    private var shownPhone: String = ""
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
 
@@ -74,7 +77,23 @@ class MyReportsFragment : Fragment() {
         }
     }
 
+    /**
+     * Sessions from Google/email sign-in, or from builds before patient tokens existed,
+     * know a phone but hold no proof for it; the server refuses those. Ask once, with the
+     * phone filled in - phone + the bill number's last digits is enough.
+     */
+    private fun showVerifyPrompt(phone: String) {
+        listContainer.removeAllViews()
+        statusView.text = localized(R.string.reports_verify_again)
+        listContainer.addView(Button(requireContext()).apply {
+            text = localized(R.string.reports_verify_button); isAllCaps = false
+            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(12) }
+            setOnClickListener { showFetchOtherDialog(prefillPhone = phone) }
+        })
+    }
+
     private fun loadHistory(phone: String) {
+        shownPhone = phone
         statusView.text = localized(R.string.reports_loading)
         listContainer.removeAllViews()
         viewLifecycleOwner.lifecycleScope.launch {
@@ -89,9 +108,15 @@ class MyReportsFragment : Fragment() {
                     }
                     addFetchOtherButton()
                 },
-                onFailure = {
-                    statusView.text = localized(R.string.reports_unavailable)
-                    addFetchOtherButton()
+                onFailure = { err ->
+                    val code = (err as? retrofit2.HttpException)?.code()
+                    if (code == 401 || code == 403) {
+                        PatientTokens.forget(phone)
+                        showVerifyPrompt(phone)
+                    } else {
+                        statusView.text = localized(R.string.reports_unavailable)
+                        addFetchOtherButton()
+                    }
                 },
             )
         }
@@ -162,15 +187,20 @@ class MyReportsFragment : Fragment() {
             localized(R.string.reports_fetching)
         }
         viewLifecycleOwner.lifecycleScope.launch {
-            runCatching { ReportFetcher.download(requireContext(), v.billKey, link) }
+            runCatching { ReportFetcher.download(requireContext(), v.billKey, shownPhone, link) }
                 .onSuccess { file ->
                     btn.isEnabled = true; btn.text = original
                     runCatching { ReportFetcher.open(requireContext(), file) }
                         .onFailure { Toast.makeText(requireContext(), localized(R.string.reports_no_pdf_viewer), Toast.LENGTH_LONG).show() }
                 }
-                .onFailure {
+                .onFailure { err ->
                     btn.isEnabled = true; btn.text = original
-                    Toast.makeText(requireContext(), localized(R.string.reports_fetch_failed), Toast.LENGTH_LONG).show()
+                    if (err is ReportFetcher.NotAllowed) {
+                        PatientTokens.forget(shownPhone)
+                        showVerifyPrompt(shownPhone)
+                    } else {
+                        Toast.makeText(requireContext(), localized(R.string.reports_fetch_failed), Toast.LENGTH_LONG).show()
+                    }
                 }
         }
     }
@@ -184,12 +214,12 @@ class MyReportsFragment : Fragment() {
     }
 
     /** 2-of-3 verification for a report under a DIFFERENT number/bill (relative etc.). */
-    private fun showFetchOtherDialog() {
+    private fun showFetchOtherDialog(prefillPhone: String = "") {
         val ctx = requireContext()
         val box = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(8), dp(20), 0) }
         val etName = EditText(ctx).apply { hint = localized(R.string.verify_patient_name_hint); inputType = InputType.TYPE_TEXT_FLAG_CAP_WORDS or InputType.TYPE_CLASS_TEXT }
-        val etPhone = EditText(ctx).apply { hint = localized(R.string.verify_phone_hint); inputType = InputType.TYPE_CLASS_PHONE }
-        val etBill = EditText(ctx).apply { hint = localized(R.string.verify_bill_no_hint); inputType = InputType.TYPE_CLASS_NUMBER }
+        val etPhone = EditText(ctx).apply { hint = localized(R.string.verify_phone_hint); inputType = InputType.TYPE_CLASS_PHONE; setText(prefillPhone) }
+        val etBill = EditText(ctx).apply { hint = localized(R.string.verify_bill_no_hint); inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS }
         var billDateIso: String? = null
         val dateBtn = Button(ctx).apply {
             text = localized(R.string.verify_pick_bill_date); isAllCaps = false
@@ -228,9 +258,11 @@ class MyReportsFragment : Fragment() {
                     repo.verify(name, phone, bill, billDateIso).fold(
                         onSuccess = { r ->
                             if (r.matched && r.phone.isNotBlank()) {
+                                PatientTokens.save(r.phone, r.token)
                                 dialog.dismiss()
                                 Toast.makeText(ctx, localized(R.string.verify_showing_reports_for, r.patientName), Toast.LENGTH_SHORT).show()
-                                loadHistory(r.phone)   // show that person's full history
+                                // show that person's full history, fresh (the old list may be another number's)
+                                loadHistory(r.phone)
                             } else {
                                 Toast.makeText(ctx, localized(R.string.verify_no_match), Toast.LENGTH_LONG).show()
                             }

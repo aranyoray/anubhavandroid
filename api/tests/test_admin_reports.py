@@ -176,58 +176,57 @@ class ReportShapeTests(unittest.TestCase):
 
 
 class EndpointTests(unittest.TestCase):
+    """The Admin screen signs in with an AKTIV user; each report follows that user's rights."""
+
     def setUp(self):
         self.client = TestClient(main.app)
+        env = patch.dict(os.environ, {"AKTIV_TOKEN_SECRET": "test-secret", "AKTIV_API_KEY": ""})
+        env.start()
+        self.addCleanup(env.stop)
+        self.token = main.tokens.staff_token(13)
 
-    def test_check_rejects_wrong_password(self):
-        with patch.object(main, "admin_password", return_value="nabllab"):
-            self.assertEqual(
-                self.client.get("/api/admin/check", headers={"X-Admin-Password": "x"}).status_code, 401
-            )
-            self.assertEqual(
-                self.client.get("/api/admin/check", headers={"X-Admin-Password": "nabllab"}).status_code, 200
-            )
+    def _get(self, params, perms):
+        with patch.object(main.roles, "load_user_permissions", return_value=perms),                 patch.object(main, "build_report", return_value={"report": params["report"]}) as build:
+            r = self.client.get("/api/admin/report", params=params, headers={"X-Staff-Token": self.token})
+        return r, build
 
-    def test_check_rejects_missing_password_header(self):
-        with patch.object(main, "admin_password", return_value="nabllab"):
-            self.assertEqual(self.client.get("/api/admin/check").status_code, 401)
-
-    def test_password_is_not_in_the_query_string(self):
-        # It must travel as a header so it never reaches web-server access logs.
-        with patch.object(main, "admin_password", return_value="nabllab"):
-            r = self.client.get("/api/admin/check", params={"password": "nabllab"})
+    def test_report_requires_sign_in(self):
+        r = self.client.get("/api/admin/report", params={"report": "tests"})
+        self.assertEqual(r.status_code, 401)
+        r = self.client.get("/api/admin/report", params={"report": "tests"}, headers={"X-Staff-Token": "forged.x"})
         self.assertEqual(r.status_code, 401)
 
-    def test_report_requires_password(self):
-        with patch.object(main, "admin_password", return_value="nabllab"):
-            r = self.client.get(
-                "/api/admin/report", params={"report": "income"}, headers={"X-Admin-Password": "wrong"}
-            )
+    def test_old_shared_password_no_longer_opens_reports(self):
+        r = self.client.get("/api/admin/report", params={"report": "tests"}, headers={"X-Admin-Password": "nabllab"})
         self.assertEqual(r.status_code, 401)
+        self.assertEqual(self.client.get("/api/admin/check").status_code, 404)
 
-    def test_report_passes_flags_through(self):
-        expected = {"report": "tests", "title": "Tests", "summary": [], "sections": []}
-        with patch.object(main, "admin_password", return_value="nabllab"), \
-                patch.object(main, "build_report", return_value=expected) as build:
-            r = self.client.get(
-                "/api/admin/report",
-                params={"report": "tests", "start": "2026-09-01",
-                        "end": "2026-09-18", "bill_details": "false", "test_details": "true"},
-                headers={"X-Admin-Password": "nabllab"},
-            )
+    def test_test_counts_open_to_any_staff(self):
+        r, build = self._get({"report": "tests", "start": "2026-09-01", "end": "2026-09-18",
+                              "bill_details": "false", "test_details": "true"}, {"roles": ["RECEPTION"]})
         self.assertEqual(r.status_code, 200)
         build.assert_called_once_with("tests", "2026-09-01", "2026-09-18", False, True)
 
-    def test_report_rejects_unknown_type(self):
-        with patch.object(main, "admin_password", return_value="nabllab"):
-            r = self.client.get(
-                "/api/admin/report", params={"report": "bogus"}, headers={"X-Admin-Password": "nabllab"}
-            )
-        self.assertEqual(r.status_code, 400)
+    def test_money_reports_need_account_rights(self):
+        r, build = self._get({"report": "income"}, {"roles": ["RECEPTION"], "can_view_sales": False})
+        self.assertEqual(r.status_code, 403)
+        build.assert_not_called()
 
-    def test_admin_password_default_is_the_shared_value(self):
-        with patch.dict(os.environ, {}, clear=True):
-            self.assertEqual(config.admin_password(), "nabllab")
+    def test_account_view_window_clamps_start(self):
+        perms = {"can_view_sales": True, "accountview_days": 7}
+        r, build = self._get({"report": "income", "start": "2020-01-01", "end": "2030-01-01"}, perms)
+        self.assertEqual(r.status_code, 200)
+        start = build.call_args.args[1]
+        self.assertEqual(start, (date.today() - __import__("datetime").timedelta(days=7)).isoformat())
+
+    def test_admin_sees_any_range(self):
+        r, build = self._get({"report": "income", "start": "2020-01-01"}, {"is_admin": True, "can_view_sales": True,
+                                                                            "accountview_days": 7})
+        self.assertEqual(build.call_args.args[1], "2020-01-01")
+
+    def test_report_rejects_unknown_type(self):
+        r, _ = self._get({"report": "bogus"}, {"is_admin": True})
+        self.assertEqual(r.status_code, 400)
 
 
 if __name__ == "__main__":

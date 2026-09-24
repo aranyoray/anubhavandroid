@@ -1,6 +1,7 @@
 package com.anubhav.app.data.remote
 
 import com.anubhav.app.BuildConfig
+import com.anubhav.app.utils.PatientTokens
 import com.google.gson.GsonBuilder
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -18,7 +19,8 @@ object AktivApiClient {
 
     private val gson = GsonBuilder().setLenient().create()
 
-    private val httpClient: OkHttpClient by lazy {
+    /** Shared client: API key + patient token attached, used for report PDFs too. */
+    val httpClient: OkHttpClient by lazy {
         val logging = HttpLoggingInterceptor().apply {
             level = if (BuildConfig.DEBUG) {
                 HttpLoggingInterceptor.Level.BASIC
@@ -44,6 +46,19 @@ object AktivApiClient {
                     chain.request()
                 }
                 chain.proceed(request)
+            }
+            // Patient data is answered only for the phone a verify token was issued for.
+            // Calls carry the phone as a query parameter; the few that carry it in a body
+            // (payments) belong to the signed-in patient, so fall back to that phone.
+            .addInterceptor { chain ->
+                val original = chain.request()
+                val path = original.url.encodedPath
+                val phone = original.url.queryParameter("phone") ?: PatientTokens.sessionPhone
+                val token = if (path.contains("/api/customer/")) PatientTokens.get(phone) else null
+                chain.proceed(
+                    if (token.isNullOrBlank()) original
+                    else original.newBuilder().header("X-Patient-Token", token).build(),
+                )
             }
             .addInterceptor(logging)
             .build()
@@ -81,6 +96,10 @@ object AktivApiClient {
             .addConverterFactory(GsonConverterFactory.create(gson))
             .build()
     }
+
+    /** Absolute URL for [path] on the API host. */
+    fun url(path: String): String =
+        BuildConfig.AKTIV_API_URL.ifBlank { DEFAULT_BASE_URL }.ensureTrailingSlash() + path.trimStart('/')
 
     private fun String.ensureTrailingSlash(): String =
         if (endsWith("/")) this else "$this/"

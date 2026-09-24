@@ -17,6 +17,9 @@ from auth import AuthUser  # noqa: E402
 class BackendSmokeTests(unittest.TestCase):
     def setUp(self):
         self.client = TestClient(main.app)
+        env = patch.dict(os.environ, {"AKTIV_TOKEN_SECRET": "test-secret", "AKTIV_API_KEY": ""})
+        env.start()
+        self.addCleanup(env.stop)
 
     def test_health(self):
         response = self.client.get("/health")
@@ -42,8 +45,10 @@ class BackendSmokeTests(unittest.TestCase):
             )
 
         self.assertEqual(response.status_code, 200)
+        body = response.json()
+        token = body.pop("token")
         self.assertEqual(
-            response.json(),
+            body,
             {
                 "success": True,
                 "user_key": 7,
@@ -51,8 +56,10 @@ class BackendSmokeTests(unittest.TestCase):
                 "username": "Reception",
                 "role": "staff",
                 "collector_key": None,
+                "permissions": {},
             },
         )
+        self.assertEqual(main.tokens.staff_user_key(token), 7)
 
     def test_login_rejects_invalid_credentials(self):
         with patch.object(main, "authenticate", side_effect=ValueError("bad login")):
@@ -65,14 +72,14 @@ class BackendSmokeTests(unittest.TestCase):
         self.assertEqual(response.json()["detail"], "bad login")
 
     def test_authenticate_keeps_staff_out_of_collector_scope(self):
-        with patch.object(auth, "mssql_conn", return_value=_FakeConn((9, "frontdesk", "Front Desk", "secret"))):
+        with patch.object(auth, "mssql_conn", return_value=_FakeConn((9, "frontdesk", "Front Desk", "secret"))),                 patch.object(auth, "load_user_permissions", return_value={"roles": ["REPORT"]}):
             user = auth.authenticate("frontdesk", "secret")
 
         self.assertEqual(user.role, "staff")
         self.assertIsNone(user.collector_key)
 
     def test_authenticate_assigns_collector_scope_only_to_collectors(self):
-        with patch.object(auth, "mssql_conn", return_value=_FakeConn((11, "collector1", "Sample Collector", "secret"))):
+        with patch.object(auth, "mssql_conn", return_value=_FakeConn((11, "collector1", "Sample Collector", "secret"))),                 patch.object(auth, "load_user_permissions", return_value={"roles": []}):
             user = auth.authenticate("collector1", "secret")
 
         self.assertEqual(user.role, "collector")

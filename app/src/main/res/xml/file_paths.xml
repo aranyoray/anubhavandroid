@@ -3,6 +3,9 @@
     <cache-path
         name="shared_reports"
         path="shared_reports/" />
+    <cache-path
+        name="staff_reports"
+        path="staff_reports/" />
     <files-path
         name="saved_reports"
         path="saved_reports/" />

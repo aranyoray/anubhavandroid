@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 import hmac
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from db import mssql_conn
+from roles import load_user_permissions
 
 
 @dataclass
@@ -12,16 +13,26 @@ class AuthUser:
     user_key: int
     userid: str
     username: str | None
-    role: str = "staff"
+    role: str = "staff"                 # primary role label for display
     collector_key: int | None = None
+    permissions: dict = field(default_factory=dict)
 
 
-def _user_role(userid: str, username: str | None) -> str:
-    source = f"{userid} {username or ''}".lower()
-    if any(token in source for token in ("collector", "collection", "agent")):
-        return "collector"
-    if any(token in source for token in ("admin", "manager", "owner")):
+def _primary_role(perms: dict, userid: str = "", username: str | None = None) -> str:
+    if perms.get("is_admin"):
         return "admin"
+    roles = perms.get("roles") or []
+    # Collectors are recognised by AKTIV role, or - where the clinic never gave them
+    # one - by the login name the older builds keyed on.
+    name = f"{userid} {username or ''}".lower()
+    if any("COLL" in r or "SAMPLE" in r for r in roles) or any(
+        t in name for t in ("collector", "collection", "agent")
+    ):
+        return "collector"
+    if perms.get("can_view_sales"):
+        return "account"
+    if perms.get("can_book"):
+        return "reception"
     return "staff"
 
 
@@ -52,11 +63,13 @@ def authenticate(userid: str, password: str) -> AuthUser:
     if not hmac.compare_digest(stored.encode("utf-8"), password.encode("utf-8")):
         raise ValueError("Invalid username or password")
 
-    role = _user_role(str(db_userid or login_id), str(username) if username else None)
+    perms = load_user_permissions(int(user_key))
+    role = _primary_role(perms, str(db_userid or login_id), str(username) if username else None)
     return AuthUser(
         user_key=int(user_key),
         userid=str(db_userid or login_id),
         username=str(username) if username else str(db_userid or login_id),
         role=role,
         collector_key=int(user_key) if role in ("collector", "admin") else None,
+        permissions=perms,
     )

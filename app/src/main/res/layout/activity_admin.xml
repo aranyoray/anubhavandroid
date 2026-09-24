@@ -40,6 +40,57 @@
                 android:textColor="@color/brand_dark_blue"
                 android:textSize="20sp"
                 android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/btnAdminSignOut"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="?attr/selectableItemBackground"
+                android:minHeight="@dimen/touch_target_min"
+                android:gravity="center_vertical"
+                android:padding="8dp"
+                android:text="@string/admin_sign_out"
+                android:textColor="@color/brand_dark_blue"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <!-- Who is signed in, and the AKTIV actions their role allows -->
+        <TextView
+            android:id="@+id/tvStaffWho"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingBottom="8dp"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp" />
+
+        <LinearLayout
+            android:id="@+id/adminActions"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="14dp"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnNewBooking"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="4dp"
+                android:layout_weight="1"
+                android:text="@string/admin_new_booking"
+                android:textAllCaps="false"
+                app:cornerRadius="24dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnFindBill"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:layout_weight="1"
+                android:text="@string/admin_find_bill"
+                android:textAllCaps="false"
+                app:cornerRadius="24dp" />
         </LinearLayout>
 
         <!-- From / To -->

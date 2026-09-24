@@ -32,6 +32,8 @@ data class CustomerVerifyResponse(
     /** canonical phone recovered from the matched bill — key the portal off this. */
     val phone: String = "",
     val bills: List<VerifiedBill> = emptyList(),
+    /** Server-signed proof of this match; report calls for [phone] need it. */
+    val token: String? = null,
 )
 
 /** One AKTIV visit (bill) from the static all-history DB — the My Reports row. */

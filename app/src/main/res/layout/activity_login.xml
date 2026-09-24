@@ -389,13 +389,14 @@
                 android:id="@+id/tvAdminLogin"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
+                android:layout_marginTop="16dp"
+                android:alpha="0.55"
                 android:gravity="center_vertical"
                 android:minHeight="@dimen/touch_target_min"
                 android:padding="8dp"
                 android:text="@string/admin_login"
                 android:textColor="@color/text_secondary"
-                android:textSize="13sp" />
+                android:textSize="11sp" />
         </LinearLayout>
     </ScrollView>
 </FrameLayout>

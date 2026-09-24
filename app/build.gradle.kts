@@ -50,11 +50,12 @@ android {
         // Shared app key for the customer API. The deployed API rejects unkeyed requests with
         // 401 "Invalid or missing API key"; it is attached to every call when non-blank and
         // omitted entirely when blank, so a keyless dev build behaves exactly as before. The
-        // header name is overridable in case the server expects something other than X-ALC-Key.
+        // header name is overridable; the server reads X-API-Key (and X-ALC-Key, which builds
+        // up to #6 sent - the mismatch that made every request from them a 401).
         buildConfigField("String", "AKTIV_API_KEY", quoted(appConfig("AKTIV_API_KEY")))
         // .ifBlank guards the CI case where an unset repo variable arrives as an empty env
         // string: an empty header name would crash OkHttp once a key is present.
-        buildConfigField("String", "AKTIV_API_KEY_HEADER", quoted(appConfig("AKTIV_API_KEY_HEADER", "X-ALC-Key").ifBlank { "X-ALC-Key" }))
+        buildConfigField("String", "AKTIV_API_KEY_HEADER", quoted(appConfig("AKTIV_API_KEY_HEADER", "X-API-Key").ifBlank { "X-API-Key" }))
     }
 
     signingConfigs {

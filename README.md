@@ -18,7 +18,15 @@ small FastAPI service that connects it to the clinic's AKTIV billing system.
 ## App features
 
 - **Login** — Google / Facebook / email via Firebase, or the OTP-free clinic check
-  (any two of patient name, bill number or bill date, phone must match an AKTIV bill).
+  (any two of patient name, bill number or bill date, phone must match an AKTIV bill;
+  with the phone, the last 3–4 digits of the bill number are enough). A successful check
+  returns a patient token scoped to that phone; the API answers report, bill and payment
+  calls only for the phone a token was issued for.
+- **Admin** — the small "Admin? Click here" link under the login form. Staff sign in with
+  their AKTIV user id and password; the screen offers what their AKTIV roles allow
+  (test counts and bill lookup for everyone; income/CC/due for account rights; new
+  booking, edit and cancel for booking, BILLCHANGE and cancel rights). The server checks
+  the same roles on every call (`api/roles.py`, `X-Staff-Token`).
 - **Book a test** — search the catalog, pick a prebook date (10th / 20th / 30th) and time
   slot, optionally geotag the home-collection address (GPS or an offline Leaflet map
   picker), and pay the 50% advance through Razorpay.
@@ -53,8 +61,14 @@ Android app ──HTTPS──▶ api/ (FastAPI)
 ```
 
 Bills, receipts and bill numbers are always written to and read from the live AKTIV
-database. Neon is a batch mirror used for master data and the patient's report history,
-so it also works while the clinic PC is switched off.
+database. Neon is a batch mirror (every 15 min while the clinic PC is on) used for master
+data and the patient's report history. Patient login and history read the live database
+first and fall back to the mirror, and history overlays the last 45 days from the live
+database so a bill made minutes ago shows up.
+
+The API, the Cloudflare tunnel, IIS (which renders report PDFs) and SQL Server all run on
+the clinic PC, which shuts down at midnight and starts at 7 AM. Overnight the app can only
+show what it has already cached on the phone (report lists and PDFs a patient has opened).
 
 ## Building the app
 

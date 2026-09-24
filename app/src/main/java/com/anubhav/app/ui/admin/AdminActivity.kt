@@ -2,22 +2,37 @@ package com.anubhav.app.ui.admin
 
 import android.app.DatePickerDialog
 import android.os.Bundle
+import android.text.InputType
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.widget.CheckBox
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ProgressBar
+import android.widget.RadioButton
+import android.widget.RadioGroup
+import android.widget.ScrollView
 import android.widget.TableLayout
 import android.widget.TableRow
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.anubhav.app.R
 import com.anubhav.app.data.model.AdminReport
 import com.anubhav.app.data.model.AdminSection
+import com.anubhav.app.data.model.AktivBookingRequest
+import com.anubhav.app.data.model.AktivTest
+import com.anubhav.app.data.model.StaffBillDetail
+import com.anubhav.app.data.model.StaffBillEdit
+import com.anubhav.app.data.model.StaffPermissions
 import com.anubhav.app.data.repository.AdminRepository
+import com.anubhav.app.data.repository.AktivRepository
+import com.anubhav.app.utils.ReportFetcher
+import com.anubhav.app.utils.StaffSession
 import com.anubhav.app.utils.localized
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.checkbox.MaterialCheckBox
@@ -26,15 +41,21 @@ import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.launch
 
 /**
- * Admin booking-details screen (reached from the login screen with the admin password).
- * A date range + Bill/Test detail toggles feed the four report buttons — Tests, Income,
- * CC (collection centres) and Due — each rendered as a headline strip plus tables that
- * the server (`api/admin_reports.py`) has already formatted.
+ * Admin screen for AKTIV staff, reached from "Admin? Click here" on the login screen after
+ * signing in with an AKTIV user id + password. What it offers follows that user's AKTIV
+ * roles: anyone can look bills up and see test counts; money reports need account rights;
+ * New booking needs booking rights; Edit and Cancel need BILLCHANGE / cancel rights. The
+ * server checks the same rights on every call - hiding a button is only a courtesy.
+ *
+ * Reports: a date range + Bill/Test detail toggles feed Tests, Income, CC (collection
+ * centres) and Due, each rendered as a headline strip plus tables that the server
+ * (`api/admin_reports.py`) has already formatted.
  */
 class AdminActivity : AppCompatActivity() {
 
     private val repo = AdminRepository()
-    private lateinit var password: String
+    private val catalog = AktivRepository()
+    private lateinit var perms: StaffPermissions
 
     private var from: LocalDate = LocalDate.now()
     private var to: LocalDate = LocalDate.now()
@@ -52,12 +73,36 @@ class AdminActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        password = intent.getStringExtra(EXTRA_PASSWORD).orEmpty()
-        if (password.isBlank()) {
+        val staff = StaffSession.current
+        if (staff == null || !StaffSession.isSignedIn) {
             finish()
             return
         }
+        perms = staff.permissions
         setContentView(R.layout.activity_admin)
+
+        val roles = perms.roles.joinToString(", ").ifBlank { staff.role }
+        findViewById<TextView>(R.id.tvStaffWho).text =
+            localized(R.string.admin_signed_in_as, staff.username.ifBlank { staff.userid }, roles)
+        findViewById<TextView>(R.id.btnAdminSignOut).apply {
+            text = localized(R.string.admin_sign_out)
+            setOnClickListener {
+                StaffSession.signOut()
+                finish()
+            }
+        }
+        findViewById<MaterialButton>(R.id.btnNewBooking).apply {
+            text = localized(R.string.admin_new_booking)
+            visibility = if (perms.canBook) View.VISIBLE else View.GONE
+            setOnClickListener { showNewBooking() }
+        }
+        findViewById<MaterialButton>(R.id.btnFindBill).apply {
+            text = localized(R.string.admin_find_bill)
+            setOnClickListener { showFindBill() }
+        }
+        // Money figures follow AKTIV's account-view rights; test counts are for everyone.
+        val money = if (perms.canViewSales) View.VISIBLE else View.GONE
+        listOf(R.id.btnIncome, R.id.btnCC, R.id.btnDue).forEach { findViewById<View>(it).visibility = money }
 
         tvFrom = findViewById(R.id.tvFromDate)
         tvTo = findViewById(R.id.tvToDate)
@@ -109,7 +154,6 @@ class AdminActivity : AppCompatActivity() {
         status.text = localized(R.string.loading)
         lifecycleScope.launch {
             repo.report(
-                password = password,
                 report = report,
                 start = from.format(isoFmt),
                 end = to.format(isoFmt),
@@ -122,15 +166,335 @@ class AdminActivity : AppCompatActivity() {
                 },
                 onFailure = {
                     progress.visibility = View.GONE
-                    status.text = it.message ?: localized(R.string.network_error)
-                    Toast.makeText(
-                        this@AdminActivity,
-                        it.message ?: localized(R.string.network_error),
-                        Toast.LENGTH_LONG,
-                    ).show()
+                    status.text = failure(it)
                 },
             )
         }
+    }
+
+    /**
+     * Toast the reason a staff call failed and return it. An expired or revoked sign-in
+     * (401) ends the session; a refusal (403) says the AKTIV role does not allow it.
+     */
+    private fun failure(err: Throwable): String {
+        val message = when (AdminRepository.statusOf(err)) {
+            401 -> localized(R.string.admin_session_expired)
+            403 -> AdminRepository.messageOf(err) ?: localized(R.string.admin_not_allowed)
+            null -> localized(R.string.network_error)
+            else -> AdminRepository.messageOf(err) ?: localized(R.string.something_went_wrong)
+        }
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+        if (AdminRepository.statusOf(err) == 401) {
+            StaffSession.signOut()
+            finish()
+        }
+        return message
+    }
+
+    private fun column(): LinearLayout = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        setPadding(dp(20), dp(8), dp(20), 0)
+    }
+
+    private fun field(hintRes: Int, type: Int, value: String = ""): EditText = EditText(this).apply {
+        hint = localized(hintRes)
+        inputType = type
+        setText(value)
+    }
+
+    private fun sexPicker(current: String): RadioGroup = RadioGroup(this).apply {
+        orientation = RadioGroup.HORIZONTAL
+        listOf("MALE", "FEMALE", "OTHER").forEach { sex ->
+            addView(RadioButton(this@AdminActivity).apply {
+                id = View.generateViewId()
+                text = sex
+                tag = sex
+                isChecked = sex == current.ifBlank { "MALE" }
+            })
+        }
+    }
+
+    private fun RadioGroup.selectedTag(): String? =
+        findViewById<RadioButton>(checkedRadioButtonId)?.tag as? String
+
+    private fun rupees(v: Double): String = String.format(java.util.Locale.US, "%,.0f", v)
+
+    // ---------------------------------------------------------------- find / view a bill
+
+    private fun showFindBill() {
+        val box = column()
+        val query = field(R.string.admin_find_bill_hint, InputType.TYPE_CLASS_TEXT)
+        val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        box.addView(query)
+        box.addView(ScrollView(this).apply {
+            addView(list)
+            layoutParams = LinearLayout.LayoutParams(MATCH, dp(320))
+        })
+        val dialog = AlertDialog.Builder(this)
+            .setTitle(localized(R.string.admin_find_bill))
+            .setView(box)
+            .setPositiveButton(localized(R.string.admin_search), null)
+            .setNegativeButton(localized(R.string.admin_close), null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val q = query.text.toString().trim()
+                if (q.length < 2) return@setOnClickListener
+                list.removeAllViews()
+                lifecycleScope.launch {
+                    repo.searchBills(q).fold(
+                        onSuccess = { bills ->
+                            if (bills.isEmpty()) {
+                                list.addView(TextView(this@AdminActivity).apply {
+                                    text = localized(R.string.admin_no_bills)
+                                    setPadding(0, dp(12), 0, 0)
+                                })
+                            }
+                            bills.forEach { b ->
+                                list.addView(TextView(this@AdminActivity).apply {
+                                    text = "${b.billNo}  ·  ${b.billDate}\n${b.patientName}  ·  ${b.phone}"
+                                    textSize = 14f
+                                    setPadding(0, dp(10), 0, dp(10))
+                                    setBackgroundResource(android.R.drawable.list_selector_background)
+                                    setOnClickListener { showBill(b.billKey) }
+                                })
+                            }
+                        },
+                        onFailure = { failure(it) },
+                    )
+                }
+            }
+        }
+        dialog.show()
+    }
+
+    private fun showBill(billKey: Int) {
+        lifecycleScope.launch {
+            repo.bill(billKey).fold(
+                onSuccess = { renderBill(it) },
+                onFailure = { failure(it) },
+            )
+        }
+    }
+
+    private fun renderBill(bill: StaffBillDetail) {
+        val box = column()
+        box.addView(TextView(this).apply {
+            text = localized(
+                R.string.admin_bill_summary, bill.billNo, bill.billDate,
+                rupees(bill.netAmount), rupees(bill.receivedAmount),
+            )
+            textSize = 14f
+        })
+        box.addView(TextView(this).apply {
+            val age = bill.ageYear?.let { "$it y" } ?: "-"
+            text = localized(R.string.admin_patient_line, bill.patientName, bill.phone, "${bill.sex} $age".trim())
+            textSize = 15f
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            setPadding(0, dp(8), 0, dp(6))
+        })
+        bill.tests.forEach { t ->
+            box.addView(TextView(this).apply {
+                val state = localized(if (t.ready) R.string.admin_test_ready else R.string.admin_test_pending)
+                text = "• ${t.testName} ($state)"
+                textSize = 13f
+            })
+        }
+        val dialog = AlertDialog.Builder(this)
+            .setView(ScrollView(this).apply { addView(box) })
+            .setNegativeButton(localized(R.string.admin_close), null)
+            .create()
+        val actions = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, dp(12), 0, 0)
+        }
+        fun action(label: Int, onClick: () -> Unit) = actions.addView(MaterialButton(this).apply {
+            text = localized(label)
+            isAllCaps = false
+            setOnClickListener { onClick() }
+        })
+        if (bill.tests.any { it.ready }) action(R.string.admin_view_report) { openReport(bill.billKey) }
+        if (perms.canEditBooking) action(R.string.admin_edit) { dialog.dismiss(); showEdit(bill) }
+        if (perms.canCancelBooking) action(R.string.admin_cancel_bill) { dialog.dismiss(); confirmCancel(bill) }
+        box.addView(actions)
+        dialog.show()
+    }
+
+    private fun openReport(billKey: Int) {
+        lifecycleScope.launch {
+            repo.reportPdf(this@AdminActivity, billKey).fold(
+                onSuccess = { file ->
+                    runCatching { ReportFetcher.open(this@AdminActivity, file) }.onFailure {
+                        Toast.makeText(this@AdminActivity, localized(R.string.reports_no_pdf_viewer), Toast.LENGTH_LONG).show()
+                    }
+                },
+                onFailure = { failure(it) },
+            )
+        }
+    }
+
+    private fun showEdit(bill: StaffBillDetail) {
+        val box = column()
+        val name = field(R.string.verify_patient_name_hint, InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS, bill.patientName)
+        val phone = field(R.string.verify_phone_hint, InputType.TYPE_CLASS_PHONE, bill.phone)
+        val sex = sexPicker(bill.sex)
+        val age = field(R.string.admin_age_hint, InputType.TYPE_CLASS_NUMBER, bill.ageYear?.toString().orEmpty())
+        val remarks = field(R.string.admin_remarks_hint, InputType.TYPE_CLASS_TEXT, bill.remarks)
+        listOf(name, phone, sex, age, remarks).forEach { box.addView(it) }
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("${localized(R.string.admin_edit)} · ${bill.billNo}")
+            .setView(ScrollView(this).apply { addView(box) })
+            .setPositiveButton(localized(R.string.admin_save), null)
+            .setNegativeButton(localized(R.string.cancel), null)
+            .create()
+        dialog.setOnShowListener {
+            val save = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+            save.setOnClickListener {
+                // Send only what changed, so an edit never rewrites fields nobody touched.
+                fun changed(new: String, old: String) = new.trim().takeIf { it != old.trim() }
+                val edit = StaffBillEdit(
+                    patientName = changed(name.text.toString(), bill.patientName),
+                    phone = changed(phone.text.toString(), bill.phone),
+                    sex = sex.selectedTag()?.takeIf { it != bill.sex },
+                    ageYear = age.text.toString().toIntOrNull()?.takeIf { it != bill.ageYear },
+                    remarks = changed(remarks.text.toString(), bill.remarks),
+                )
+                if (edit == StaffBillEdit()) {
+                    dialog.dismiss()
+                    return@setOnClickListener
+                }
+                save.isEnabled = false
+                lifecycleScope.launch {
+                    repo.editBill(bill.billKey, edit).fold(
+                        onSuccess = {
+                            dialog.dismiss()
+                            Toast.makeText(this@AdminActivity, localized(R.string.admin_saved), Toast.LENGTH_SHORT).show()
+                            renderBill(it)
+                        },
+                        onFailure = {
+                            save.isEnabled = true
+                            failure(it)
+                        },
+                    )
+                }
+            }
+        }
+        dialog.show()
+    }
+
+    private fun confirmCancel(bill: StaffBillDetail) {
+        AlertDialog.Builder(this)
+            .setMessage(localized(R.string.admin_cancel_confirm, bill.billNo))
+            .setPositiveButton(localized(R.string.admin_cancel_bill)) { _, _ ->
+                lifecycleScope.launch {
+                    repo.cancelBooking(bill.billKey).fold(
+                        onSuccess = {
+                            Toast.makeText(
+                                this@AdminActivity,
+                                localized(R.string.admin_cancelled, bill.billNo),
+                                Toast.LENGTH_LONG,
+                            ).show()
+                        },
+                        onFailure = { failure(it) },
+                    )
+                }
+            }
+            .setNegativeButton(localized(R.string.cancel), null)
+            .show()
+    }
+
+    // ---------------------------------------------------------------- new booking
+
+    private fun showNewBooking() {
+        val box = column()
+        val name = field(R.string.verify_patient_name_hint, InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS)
+        val phone = field(R.string.verify_phone_hint, InputType.TYPE_CLASS_PHONE)
+        val sex = sexPicker("MALE")
+        val age = field(R.string.admin_age_hint, InputType.TYPE_CLASS_NUMBER)
+        val search = field(R.string.admin_test_search_hint, InputType.TYPE_CLASS_TEXT)
+        val picked = linkedMapOf<Int, AktivTest>()
+        val summary = TextView(this).apply { setPadding(0, dp(6), 0, dp(6)); textSize = 13f }
+        val results = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val paid = field(R.string.admin_amount_paid_hint, InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL)
+        val mode = RadioGroup(this).apply {
+            orientation = RadioGroup.HORIZONTAL
+            listOf("CASH", "UPI", "CARD").forEach { m ->
+                addView(RadioButton(this@AdminActivity).apply {
+                    id = View.generateViewId(); text = m; tag = m; isChecked = m == "CASH"
+                })
+            }
+        }
+        fun refreshSummary() {
+            summary.text = localized(R.string.admin_selected_tests, picked.size, rupees(picked.values.sumOf { it.rate }))
+        }
+        fun showResults(tests: List<AktivTest>) {
+            results.removeAllViews()
+            // Keep already-picked tests on screen so they can be un-ticked after a new search.
+            (picked.values + tests.filterNot { picked.containsKey(it.testKey) }).take(40).forEach { t ->
+                results.addView(CheckBox(this).apply {
+                    text = "${t.testName}  ₹${rupees(t.rate)}"
+                    isChecked = picked.containsKey(t.testKey)
+                    setOnCheckedChangeListener { _, on ->
+                        if (on) picked[t.testKey] = t else picked.remove(t.testKey)
+                        refreshSummary()
+                    }
+                })
+            }
+        }
+        refreshSummary()
+        search.setOnEditorActionListener { v, _, _ ->
+            val q = v.text.toString().trim()
+            lifecycleScope.launch {
+                catalog.searchTests(q).fold(onSuccess = { showResults(it) }, onFailure = { failure(it) })
+            }
+            true
+        }
+        search.imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH
+        listOf(name, phone, sex, age, search, results, summary, paid, mode).forEach { box.addView(it) }
+
+        val dialog = AlertDialog.Builder(this)
+            .setTitle(localized(R.string.admin_new_booking))
+            .setView(ScrollView(this).apply { addView(box) })
+            .setPositiveButton(localized(R.string.admin_create), null)
+            .setNegativeButton(localized(R.string.cancel), null)
+            .create()
+        dialog.setOnShowListener {
+            val create = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+            create.setOnClickListener {
+                val digits = phone.text.toString().filter { it.isDigit() }.takeLast(10)
+                if (name.text.isBlank() || digits.length < 10 || picked.isEmpty()) {
+                    Toast.makeText(this, localized(R.string.admin_booking_fill), Toast.LENGTH_LONG).show()
+                    return@setOnClickListener
+                }
+                create.isEnabled = false
+                val request = AktivBookingRequest(
+                    patientName = name.text.toString().trim(),
+                    phone = digits,
+                    sex = sex.selectedTag() ?: "MALE",
+                    ageYear = age.text.toString().toIntOrNull(),
+                    testKeys = picked.keys.toList(),
+                    amountPaid = paid.text.toString().toDoubleOrNull(),
+                    receiptMode = mode.selectedTag() ?: "CASH",
+                )
+                lifecycleScope.launch {
+                    repo.createBooking(request).fold(
+                        onSuccess = { r ->
+                            dialog.dismiss()
+                            Toast.makeText(
+                                this@AdminActivity,
+                                localized(R.string.admin_booking_done, r.billNo, rupees(r.netAmount)),
+                                Toast.LENGTH_LONG,
+                            ).show()
+                        },
+                        onFailure = {
+                            create.isEnabled = true
+                            failure(it)
+                        },
+                    )
+                }
+            }
+        }
+        dialog.show()
     }
 
     private fun render(data: AdminReport) {
@@ -261,7 +625,6 @@ class AdminActivity : AppCompatActivity() {
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
 
     companion object {
-        const val EXTRA_PASSWORD = "admin_password"
         // Cap the rows materialised into Views per section so a wide-range detail report
         // cannot freeze a low-end phone; the count line still reports the true total.
         private const val MAX_RENDER_ROWS = 150

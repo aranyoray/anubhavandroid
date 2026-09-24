@@ -37,15 +37,35 @@ def neon_url() -> str:
     return os.environ["NEON_DATABASE_URL"]
 
 
-def admin_password() -> str:
-    """Password gating the in-app Admin booking-details reports.
+def api_key() -> str:
+    """
+    Shared secret required on /api/* (header X-API-Key; X-ALC-Key is accepted too,
+    since app builds before this fix sent that name).
 
-    Defaults to the value the clinic was given so the feature works out of the box;
-    set AKTIV_ADMIN_PASSWORD in the server env to override it in production. The app
-    never ships this — the admin types it at login and the server is the authority.
+    This API is reachable from the public internet (cloudflared tunnel ->
+    api.anubhavlifecare.in), so the key must be set in production. It ships inside
+    the APK, so treat it as a speed bump against drive-by scanners, not as auth:
+    patient data additionally needs a patient token and staff actions a staff token
+    (see tokens.py). Empty means "no key configured" - only safe on a LAN.
     """
     load_env()
-    return os.environ.get("AKTIV_ADMIN_PASSWORD", "nabllab")
+    return os.environ.get("AKTIV_API_KEY", "").strip()
+
+
+def token_secret() -> str:
+    """HMAC secret signing patient/staff tokens (tokens.py). Falls back to the API key
+    so a server with only AKTIV_API_KEY set still issues verifiable tokens; set
+    AKTIV_TOKEN_SECRET separately so the secret never ships in the APK."""
+    load_env()
+    return os.environ.get("AKTIV_TOKEN_SECRET", "").strip() or api_key()
+
+
+def report_fetch_base() -> str:
+    """Where the API itself fetches LabReportPrint PDFs. It runs on the same box as
+    IIS, so go straight to it: through the public hostname, Cloudflare answers
+    Python's user agent with a 403 challenge page and every server-side PDF failed."""
+    load_env()
+    return os.environ.get("REPORT_FETCH_BASE", "http://localhost/AKTIV").rstrip("/")
 
 
 def aktiv_settings() -> dict:
