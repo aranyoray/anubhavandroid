@@ -37,6 +37,17 @@ def neon_url() -> str:
     return os.environ["NEON_DATABASE_URL"]
 
 
+def admin_password() -> str:
+    """Password gating the in-app Admin booking-details reports.
+
+    Defaults to the value the clinic was given so the feature works out of the box;
+    set AKTIV_ADMIN_PASSWORD in the server env to override it in production. The app
+    never ships this — the admin types it at login and the server is the authority.
+    """
+    load_env()
+    return os.environ.get("AKTIV_ADMIN_PASSWORD", "nabllab")
+
+
 def aktiv_settings() -> dict:
     """AKTIV write behaviour — receptionist user, live bookings by default."""
     load_env()

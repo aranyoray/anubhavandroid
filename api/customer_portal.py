@@ -5,7 +5,7 @@ import re
 from datetime import date, datetime, timedelta
 from typing import Any
 
-from aktiv_booking import _next_key, push_booking, search_tests
+from aktiv_booking import _next_key, _resolve_tests, push_booking
 from config import aktiv_settings
 from db import fetch_all, mssql_conn, neon_conn
 from patient_match import build_view_link
@@ -29,9 +29,9 @@ def _normalize_phone(phone: str) -> str:
 
 
 def _phone_clause() -> str:
-  return """
+    return """
     REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '+91', ''), '+', '') LIKE %s
-  """
+    """
 
 
 def _ensure_slot_table() -> None:
@@ -71,6 +71,29 @@ def _count_slot_bookings(slot_date: date, time_slot: str) -> int:
         )
         row = cur.fetchone()
         return int(row[0]) if row else 0
+
+
+def _slot_booking_counts(dates: list[date]) -> dict[tuple[date, str], int]:
+    """Bookings per (date, slot) for the whole calendar in one query.
+
+    The calendar used to open a Neon connection (and re-run CREATE TABLE) for every
+    date x slot cell — 27 round trips for a three-month view — on every visit to
+    the booking screen.
+    """
+    if not dates:
+        return {}
+    _ensure_slot_table()
+    with neon_conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT slot_date, time_slot, COUNT(*)
+            FROM customer_prebook_slots
+            WHERE slot_date BETWEEN %s AND %s
+            GROUP BY slot_date, time_slot
+            """,
+            (min(dates), max(dates)),
+        )
+        return {(row[0], row[1]): int(row[2]) for row in cur.fetchall()}
 
 
 def _record_slot_booking(
@@ -180,7 +203,7 @@ def list_customer_bills(*, phone: str, limit: int = 50) -> list[dict[str, Any]]:
         rows = fetch_all(
             cur,
             f"""
-            SELECT TOP {min(limit, 100)}
+            SELECT TOP {max(1, min(limit, 100))}
                 b.bill_key, b.bill_no, b.billdate, b.patientname, b.phone,
                 b.billamount, b.netamount, b.receivedamount,
                 (b.netamount - ISNULL(b.receivedamount, 0)) AS pending_amount,
@@ -218,7 +241,7 @@ def list_customer_reports(*, phone: str, limit: int = 50) -> list[dict[str, Any]
         rows = fetch_all(
             cur,
             f"""
-            SELECT TOP {min(limit, 100)}
+            SELECT TOP {max(1, min(limit, 100))}
                 b.bill_key, b.bill_no, b.billdate, b.patientname,
                 t.testname, t.testcode, d.reportingdate,
                 d.category_key, d.report_key, d.confirm_report,
@@ -256,11 +279,12 @@ def list_pending_payments(*, phone: str) -> list[dict[str, Any]]:
 
 def get_prebook_calendar(months_ahead: int = 3) -> dict[str, Any]:
     dates = _upcoming_prebook_dates(months_ahead)
+    counts = _slot_booking_counts(dates)
     slots = []
     for d in dates:
         day_slots = []
         for key, meta in TIME_SLOTS.items():
-            booked = _count_slot_bookings(d, key)
+            booked = counts.get((d, key), 0)
             remaining = max(0, SLOT_CAPACITY - booked)
             day_slots.append(
                 {
@@ -310,13 +334,13 @@ def create_customer_prebooking(
     if remaining <= 0:
         raise ValueError("Selected time slot is full")
 
-    tests = search_tests("", limit=500)
-    test_map = {t["test_key"]: t for t in tests}
-    selected = [test_map[k] for k in test_keys if k in test_map]
-    if not selected:
-        raise ValueError("No valid tests selected")
+    # Resolve the exact keys the app sent. This used to take the first 500 rows of
+    # the catalog (of ~1,700) and silently drop any selected test outside them, so
+    # the advance was computed on a partial total and the booking then failed —
+    # after Razorpay had already taken the money.
+    tests = _resolve_tests(test_keys)
 
-    total = sum(float(t["rate"]) for t in selected)
+    total = sum(t.rate for t in tests)
     required_advance = round(total * PREBOOK_ADVANCE_FRACTION, 2)
     if amount_paid + 0.01 < required_advance:
         raise ValueError(

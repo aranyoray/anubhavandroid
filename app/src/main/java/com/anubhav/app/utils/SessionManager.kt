@@ -54,11 +54,11 @@ object SessionManager {
             .getString(KEY_ROLE, "staff")
             .orEmpty()
 
-fun getCollectorKey(context: Context): Int? {
-if (!isCollector(context)) return null
-val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-return if (prefs.contains(KEY_COLLECTOR_KEY)) {
-prefs.getInt(KEY_COLLECTOR_KEY, -1).takeIf { it > 0 }
+    fun getCollectorKey(context: Context): Int? {
+        if (!isCollector(context)) return null
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return if (prefs.contains(KEY_COLLECTOR_KEY)) {
+            prefs.getInt(KEY_COLLECTOR_KEY, -1).takeIf { it > 0 }
         } else {
             getUserKey(context)
         }

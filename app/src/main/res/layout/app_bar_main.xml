@@ -22,28 +22,31 @@
             android:elevation="4dp"
             app:popupTheme="@style/Theme.AktivAdmin.PopupOverlay"
             app:title="@string/app_name"
-            app:titleMarginEnd="72dp"
+            app:titleMarginEnd="104dp"
             app:titleTextColor="@color/text_white"
             app:navigationIconTint="@color/text_white">
 
-            <!-- Language Toggle Button -->
+            <!-- Language Toggle Button. Reads "বাং/ইং" in Bengali mode, "EN/BN" in English
+                 mode (set at runtime via localized() in MainActivity). -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/language_toggle_btn"
                 style="@style/Widget.Material3.Button.TextButton"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_gravity="end"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:layout_gravity="end|center_vertical"
                 android:layout_marginEnd="8dp"
                 android:background="@drawable/language_toggle_bg"
                 android:contentDescription="@string/a11y_change_language"
                 android:fontFamily="sans-serif-medium"
-                android:text="@string/language_bengali"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:text="@string/language_toggle"
                 android:textColor="@color/brand_dark_blue"
-                android:textSize="16sp"
+                android:textSize="13sp"
                 android:textStyle="bold"
-                app:cornerRadius="24dp"
+                app:cornerRadius="20dp"
                 android:gravity="center"
-                android:minWidth="0dp"
+                android:minWidth="56dp"
                 android:minHeight="0dp"
                 android:insetTop="0dp"
                 android:insetBottom="0dp" />

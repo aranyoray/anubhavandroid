@@ -88,12 +88,12 @@ def create_collector_patient(
                 collector_user_key,
                 patient_name.strip(),
                 phone_norm,
-            age_year,
-            sex.strip().upper() if sex else None,
-            referred_by.strip() if referred_by else None,
-            notes.strip() if notes else None,
-            followup_status.strip().upper() if followup_status else None,
-        ),
+                age_year,
+                sex.strip().upper() if sex else None,
+                referred_by.strip() if referred_by else None,
+                notes.strip() if notes else None,
+                followup_status.strip().upper() if followup_status else None,
+            ),
         )
         row = cur.fetchone()
         cols = [d[0] for d in cur.description]
