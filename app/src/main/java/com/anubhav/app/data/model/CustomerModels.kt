@@ -108,11 +108,11 @@ data class CollectorPatient(
     val phone: String,
     @SerializedName("age_year") val ageYear: Int? = null,
     val sex: String? = null,
-@SerializedName("referred_by") val referredBy: String? = null,
-val notes: String? = null,
-@SerializedName("followup_status") val followupStatus: String? = null,
-@SerializedName("created_at") val createdAt: String? = null,
-@SerializedName("updated_at") val updatedAt: String? = null,
+    @SerializedName("referred_by") val referredBy: String? = null,
+    val notes: String? = null,
+    @SerializedName("followup_status") val followupStatus: String? = null,
+    @SerializedName("created_at") val createdAt: String? = null,
+    @SerializedName("updated_at") val updatedAt: String? = null,
 )
 
 data class CollectorPatientRequest(
@@ -121,9 +121,9 @@ data class CollectorPatientRequest(
     val phone: String,
     @SerializedName("age_year") val ageYear: Int? = null,
     val sex: String? = null,
-@SerializedName("referred_by") val referredBy: String? = null,
-val notes: String? = null,
-@SerializedName("followup_status") val followupStatus: String? = null,
+    @SerializedName("referred_by") val referredBy: String? = null,
+    val notes: String? = null,
+    @SerializedName("followup_status") val followupStatus: String? = null,
 )
 
 data class PrebookSlotInfo(

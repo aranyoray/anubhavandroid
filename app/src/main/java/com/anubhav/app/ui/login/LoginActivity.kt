@@ -21,7 +21,9 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.anubhav.app.MainActivity
 import com.anubhav.app.R
+import com.anubhav.app.data.repository.AdminRepository
 import com.anubhav.app.data.repository.CustomerRepository
+import com.anubhav.app.ui.admin.AdminActivity
 import com.anubhav.app.utils.CustomerSessionManager
 import com.anubhav.app.utils.LanguageManager
 import com.anubhav.app.utils.localized
@@ -47,6 +49,7 @@ class LoginActivity : AppCompatActivity() {
 
     private val auth = FirebaseAuth.getInstance()
     private val customerRepo = CustomerRepository()
+    private val adminRepo = AdminRepository()
     private lateinit var languageManager: LanguageManager
     private lateinit var googleSignInClient: GoogleSignInClient
     private val facebookCallbackManager = CallbackManager.Factory.create()
@@ -243,6 +246,77 @@ class LoginActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.tvChangeLanguage).setOnClickListener {
             showLanguageScreen()
         }
+
+        findViewById<TextView>(R.id.tvAdminLogin).setOnClickListener {
+            showAdminDialog()
+        }
+    }
+
+    /**
+     * Admin booking-details gate. The password is verified against the server (the authority
+     * on it) before the admin screen opens; it is never stored on the phone.
+     */
+    private fun showAdminDialog() {
+        hideInlineError()
+        val input = EditText(this).apply {
+            hint = localized(R.string.admin_password_hint)
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+        }
+        val pad = (16 * resources.displayMetrics.density).toInt()
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(pad + pad / 4, pad / 2, pad + pad / 4, 0)
+            addView(input)
+        }
+        val dialog = AlertDialog.Builder(this)
+            .setTitle(localized(R.string.admin_login))
+            .setView(container)
+            .setPositiveButton(localized(R.string.admin_unlock), null)
+            .setNegativeButton(localized(R.string.cancel), null)
+            .create()
+        dialog.setOnShowListener {
+            val unlock = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+            unlock.setOnClickListener {
+                val pw = input.text?.toString()?.trim().orEmpty()
+                if (pw.isEmpty()) return@setOnClickListener
+                // The dialog stays open during the network check, so disable the button to
+                // stop a double-tap from firing two checks and stacking two admin screens.
+                unlock.isEnabled = false
+                setLoading(true)
+                lifecycleScope.launch {
+                    adminRepo.check(pw).fold(
+                        onSuccess = { ok ->
+                            setLoading(false)
+                            if (ok) {
+                                dialog.dismiss()
+                                startActivity(
+                                    Intent(this@LoginActivity, AdminActivity::class.java)
+                                        .putExtra(AdminActivity.EXTRA_PASSWORD, pw),
+                                )
+                            } else {
+                                unlock.isEnabled = true
+                                Toast.makeText(
+                                    this@LoginActivity,
+                                    localized(R.string.admin_wrong_password),
+                                    Toast.LENGTH_LONG,
+                                ).show()
+                            }
+                        },
+                        onFailure = { err ->
+                            setLoading(false)
+                            unlock.isEnabled = true
+                            val message = if (err is retrofit2.HttpException && err.code() == 401) {
+                                localized(R.string.admin_wrong_password)
+                            } else {
+                                err.localizedMessage ?: localized(R.string.network_error)
+                            }
+                            Toast.makeText(this@LoginActivity, message, Toast.LENGTH_LONG).show()
+                        },
+                    )
+                }
+            }
+        }
+        dialog.show()
     }
 
     private fun handlePhoneAuth() {
@@ -354,13 +428,13 @@ class LoginActivity : AppCompatActivity() {
             showInlineError(localized(R.string.invalid_email))
             return
         }
-    if (password.length < 6) {
-        showInlineError(localized(R.string.invalid_password))
-        return
-    }
+        if (password.length < 6) {
+            showInlineError(localized(R.string.invalid_password))
+            return
+        }
 
-    setLoading(true)
-    lifecycleScope.launch {
+        setLoading(true)
+        lifecycleScope.launch {
             try {
                 val result = if (isSignUpMode) {
                     auth.createUserWithEmailAndPassword(email, password).await()
@@ -372,7 +446,7 @@ class LoginActivity : AppCompatActivity() {
                 setLoading(false)
                 showInlineError(e.localizedMessage ?: localized(if (isSignUpMode) R.string.sign_up_failed else R.string.login_failed))
             }
-    }
+        }
     }
 
     private fun signInWithGoogleToken(idToken: String) {

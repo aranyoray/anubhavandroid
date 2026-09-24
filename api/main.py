@@ -2,10 +2,11 @@
 from __future__ import annotations
 
 import logging
+import secrets
 from datetime import date
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -20,8 +21,9 @@ from aktiv_booking import (
     search_doctors,
     search_tests,
 )
+from admin_reports import REPORTS, build_report
 from catalog import get_catalog
-from config import aktiv_settings
+from config import admin_password, aktiv_settings
 from customer_portal import (
     create_customer_prebooking,
     get_customer_profile,
@@ -45,6 +47,8 @@ logger = logging.getLogger(__name__)
 def internal_error(exc: Exception) -> HTTPException:
     logger.exception("Unhandled API error")
     return HTTPException(status_code=500, detail="Internal server error")
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -383,7 +387,10 @@ def api_customer_pending(phone: str):
 
 @app.get("/api/customer/prebook/calendar")
 def api_prebook_calendar(months_ahead: int = 3):
-    return get_prebook_calendar(months_ahead=min(months_ahead, 6))
+    try:
+        return get_prebook_calendar(months_ahead=max(1, min(months_ahead, 6)))
+    except Exception as exc:
+        raise internal_error(exc) from exc
 
 
 @app.post("/api/customer/prebook")
@@ -404,6 +411,50 @@ def api_customer_prebook(body: CustomerPrebookRequest):
             latitude=body.latitude,
             longitude=body.longitude,
         )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise internal_error(exc) from exc
+
+
+# --- Admin (booking details) ---
+
+
+def _check_admin(password: str) -> None:
+    """The admin types the password at login; the server is the authority on it.
+
+    Read from a request header, never the query string, so the credential does not land
+    in web-server access logs. Compared in constant time to avoid a timing side-channel.
+    """
+    expected = admin_password()
+    if not password or not secrets.compare_digest(
+        password.encode("utf-8"), expected.encode("utf-8")
+    ):
+        raise HTTPException(status_code=401, detail="Wrong admin password")
+
+
+@app.get("/api/admin/check")
+def api_admin_check(x_admin_password: str = Header("", alias="X-Admin-Password")):
+    """Cheap password gate the app calls before opening the Admin screen — no DB touched."""
+    _check_admin(x_admin_password)
+    return {"ok": True}
+
+
+@app.get("/api/admin/report")
+def api_admin_report(
+    report: str = "income",
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    bill_details: bool = True,
+    test_details: bool = True,
+    x_admin_password: str = Header("", alias="X-Admin-Password"),
+):
+    """Booking-details report (tests | income | cc | due) over a date range, admin only."""
+    _check_admin(x_admin_password)
+    if report not in REPORTS:
+        raise HTTPException(status_code=400, detail=f"report must be one of {', '.join(REPORTS)}")
+    try:
+        return build_report(report, start, end, bill_details, test_details)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:

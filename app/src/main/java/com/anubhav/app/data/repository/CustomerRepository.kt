@@ -184,12 +184,12 @@ class CustomerRepository(
                         patientName = request.patientName,
                         phone = request.phone,
                         ageYear = request.ageYear,
-                    sex = request.sex,
-                    referredBy = request.referredBy,
-                    notes = request.notes,
-                    followupStatus = request.followupStatus,
-                    createdAt = "Saved on phone",
-                ).also { appendCollectorPatient(context, request.collectorUserKey, it) }
+                        sex = request.sex,
+                        referredBy = request.referredBy,
+                        notes = request.notes,
+                        followupStatus = request.followupStatus,
+                        createdAt = "Saved on phone",
+                    ).also { appendCollectorPatient(context, request.collectorUserKey, it) }
                 }
         }
 

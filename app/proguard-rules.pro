@@ -24,6 +24,7 @@
 -keep,allowobfuscation interface com.anubhav.app.data.remote.AktivApi
 -keep,allowobfuscation interface com.anubhav.app.data.remote.CustomerApi
 -keep,allowobfuscation interface com.anubhav.app.data.remote.CatalogApi
+-keep,allowobfuscation interface com.anubhav.app.data.remote.AdminApi
 -keepclassmembers,allowshrinking,allowobfuscation interface com.anubhav.app.data.remote.** {
     @retrofit2.http.* <methods>;
 }

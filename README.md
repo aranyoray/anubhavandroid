@@ -1,179 +1,104 @@
-# AKTIV Admin
+# Anubhav Life Care — Android app + AKTIV API
 
-Android admin app for pushing bills and appointments into AKTIV (Anubhav Life Care clinic).
+Patient-facing Android app for Anubhav Life Care (Kolkata diagnostic clinic), plus the
+small FastAPI service that connects it to the clinic's AKTIV billing system.
 
-## Features
+## What is in this repository
 
-### 🏥 Core Functionality
+| Path | What it is |
+|------|------------|
+| `app/` | Android app (Kotlin, `com.anubhav.app`) |
+| `api/` | FastAPI service the app talks to (`api/main.py`) |
+| `api/tests/` | Unit tests for the API (`python -m pytest api/tests`) |
+| `etl/sync.py` | Batch copy of AKTIV SQL Server tables into Neon Postgres |
+| `scripts/` | One-off schema inspection helpers |
+| `docs/` | Play Console notes |
+| `env.example` | Every environment variable the API and ETL read |
 
-- **Online Test Booking**: Book diagnostic tests with ease
-- **User Authentication**: Login/Signup using email or phone number
-- **Payment Integration**: Razorpay integration for advance payments
-- **Email Notifications**: Automatic email confirmations to patients and clinic
-- **Supabase Integration**: Real-time database for bookings and user data
+## App features
 
-### 📱 User Experience
+- **Login** — Google / Facebook / email via Firebase, or the OTP-free clinic check
+  (any two of patient name, bill number or bill date, phone must match an AKTIV bill).
+- **Book a test** — search the catalog, pick a prebook date (10th / 20th / 30th) and time
+  slot, optionally geotag the home-collection address (GPS or an offline Leaflet map
+  picker), and pay the 50% advance through Razorpay.
+- **My bookings / Pending payments** — bills from AKTIV with outstanding balance, payable
+  in-app.
+- **My reports** — every visit under the patient's phone; the collated report PDF is
+  fetched and cached only when tapped.
+- **Health library** — bilingual (English / Bengali) explainers and reference-range dials
+  for 94 common tests, shareable as PDF.
+- **Collector dashboard** — sample collectors log referred patients (works offline, syncs
+  later) and share reports on WhatsApp.
+- **Bengali UI** — an in-app language setting; Bengali strings live next to the English
+  ones with a `_bn` suffix.
 
-- **Home Sample Collection**: Convenient doorstep service
-- **Multiple Booking Types**:
-    - Regular booking (no time guarantee)
-    - Pre-book time slots (with advance payment)
-    - Pre-book specific doctors (with advance payment)
-- **Real-time Booking Status**: Track your appointment status
-- **WhatsApp Support**: Direct WhatsApp integration for customer support
+## Tech stack
 
-### 🔧 Technical Features
+- Kotlin, AndroidX, Material Components, Navigation component, view binding
+- Retrofit + OkHttp + Gson for the API; Room for the on-device catalog cache
+- Firebase Auth, Google Sign-In, Facebook Login, Razorpay Checkout
+- Framework `LocationManager` / `Geocoder` (no Play Services location), Leaflet +
+  OpenStreetMap bundled in `assets/map/` for the pin picker
+- Kotlin coroutines; Robolectric for JVM unit tests
+- API: FastAPI, `pymssql` (AKTIV SQL Server, read/write), `psycopg2` (Neon mirror, read)
 
-- **Modern Android Architecture**: MVVM pattern with Repository
-- **Kotlin Coroutines**: Asynchronous operations
-- **Navigation Component**: Seamless app navigation
-- **Material Design**: Beautiful and intuitive UI
-- **Offline Support**: Local caching with Room database
-
-## Tech Stack
-
-- **Language**: Kotlin
-- **Architecture**: MVVM (Model-View-ViewModel)
-- **Database**: Supabase (PostgreSQL)
-- **Authentication**: Supabase Auth
-- **Payment Gateway**: Razorpay
-- **Email Service**: SMTP with provided credentials
-- **UI**: Material Design Components
-- **Navigation**: Android Navigation Component
-- **Dependency Injection**: Hilt
-- **Networking**: Retrofit + OkHttp
-- **Image Loading**: Glide
-
-## Configuration
-
-### Environment Variables
-
-The app uses the following configuration:
-
-```kotlin
-// Supabase Configuration
-SUPABASE_URL = "your_supabase_url"
-SUPABASE_ANON_KEY = "your_supabase_anon_key"
-
-// Razorpay Configuration
-RAZORPAY_KEY_ID = "your_razorpay_key_id"
-RAZORPAY_KEY_SECRET = "your_razorpay_secret"
-
-// Email Configuration
-EMAIL_USER = "your_email_user"
-EMAIL_PASS = "your_email_app_password"
-```
-
-### Contact Information
-
-- **Phone**: +91-9230755875 | +91-9230755870
-- **WhatsApp**: +91-9230755876
-- **Email**: contact.anubhavlife@gmail.com
-- **Website**: www.anubhavlifecare.in
-
-## App Structure
+## Data flow
 
 ```
-app/
-├── src/main/java/com/anubhav/app/
-│   ├── data/
-│   │   ├── model/          # Data classes (User, Test, Booking)
-│   │   ├── remote/         # API services (Supabase client)
-│   │   └── repository/     # Repository pattern implementation
-│   ├── ui/
-│   │   ├── home/           # Home screen
-│   │   ├── gallery/        # Booking screen (temporary)
-│   │   └── slideshow/      # My Bookings screen (temporary)
-│   ├── utils/
-│   │   ├── PaymentManager  # Razorpay integration
-│   │   └── EmailManager    # Email notifications
-│   └── MainActivity.kt     # Main activity
-├── res/
-│   ├── layout/             # XML layouts
-│   ├── values/             # Strings, colors, themes
-│   └── navigation/         # Navigation graph
-└── build.gradle.kts        # Dependencies and configuration
+Android app ──HTTPS──▶ api/ (FastAPI)
+                          ├── AKTIV SQL Server  : logins, bills, receipts, live reports
+                          └── Neon Postgres     : test catalog, doctors, all-history reports
+                                                  (filled by etl/sync.py)
 ```
 
-## Key Features Implementation
+Bills, receipts and bill numbers are always written to and read from the live AKTIV
+database. Neon is a batch mirror used for master data and the patient's report history,
+so it also works while the clinic PC is switched off.
 
-### 1. Test Selection
+## Building the app
 
-- Browse 1500+ available tests
-- Search functionality
-- Category-wise filtering
-- Popular tests section
+1. Open the repo in Android Studio (AGP 8.13, Gradle 9.4).
+2. Add `app/google-services.json` for your Firebase project (a copy is committed).
+3. Optional overrides in `local.properties` (or as Gradle / environment properties):
 
-### 2. Booking Process
+   ```properties
+   AKTIV_API_URL=https://api.anubhavlifecare.in/     # default; use http://192.168.29.157:8080/ on the clinic LAN
+   RAZORPAY_KEY_ID=rzp_live_xxxxxxxx                 # payments are disabled when blank
+   ```
 
-- Select preferred date and time
-- Choose booking type (regular/pre-book)
-- Enter patient details
-- Review and confirm booking
+4. Replace the Facebook placeholders in `app/src/main/res/values/strings.xml`
+   (`facebook_app_id`, `facebook_client_token`, `fb_login_protocol_scheme`) to enable
+   Facebook login; the button reports "not configured" until then.
+5. Release builds are minified; the keep rules are in `app/proguard-rules.pro`. A
+   `keystore.properties` file at the repo root wires up release signing.
 
-### 3. Payment Integration
+Unit tests: `./gradlew :app:testDebugUnitTest`
 
-- Razorpay payment gateway
-- Advance payment for slot booking
-- Secure transaction processing
-- Payment confirmation emails
+## Running the API
 
-### 4. Email Notifications
+```bash
+cp env.example .env          # fill in MSSQL_* and NEON_DATABASE_URL
+pip install -r api/requirements.txt
+uvicorn main:app --app-dir api --host 0.0.0.0 --port 8080
+python -m pytest api/tests   # no database needed
+```
 
-- Booking confirmation to patient
-- Booking details to clinic (contact.anubhavlife@gmail.com)
-- Status update notifications
-- Professional email templates
+Key endpoints: `POST /api/auth/login`, `GET /api/catalog`, `GET /api/tests`,
+`POST /api/bookings`, `POST /api/customer/verify`, `GET /api/customer/history`,
+`GET /api/customer/prebook/calendar`, `POST /api/customer/prebook`,
+`POST /api/customer/payments`, `GET|POST /api/collector/patients`, `GET /health`.
 
-### 5. Database Operations
+## ETL
 
-- User registration and authentication
-- Booking creation and updates
-- Test catalog management
-- Real-time synchronization
+`python etl/sync.py` truncates and reloads the mirrored AKTIV tables in Neon. Run it on a
+schedule from the clinic PC; the tables must already exist in Neon.
 
-## Sample Tests Available
+## Contact
 
-| Test Name | Price | Category | Preparation |
-|-----------|-------|----------|-------------|
-| Complete Blood Count (CBC) | ₹300 | Blood Test | 12 hours fasting |
-| Lipid Profile | ₹800 | Blood Test | 12-14 hours fasting |
-| Thyroid Function Test | ₹600 | Hormone Test | No preparation |
-| Blood Sugar Fasting | ₹150 | Blood Test | 8-10 hours fasting |
-| HbA1c Test | ₹500 | Diabetes | No fasting required |
-
-## Installation & Setup
-
-1. Clone the repository
-2. Open in Android Studio
-3. Configure environment variables in `build.gradle.kts`
-4. Sync Gradle dependencies
-5. Build and run the application
-
-## Future Enhancements
-
-- [ ] Real-time chat support
-- [ ] Push notifications
-- [ ] Report download feature
-- [ ] Multi-language support
-- [ ] Dark mode theme
-- [ ] Advanced test filtering
-- [ ] Family member profiles
-- [ ] Loyalty program integration
-
-## Contributing
-
-This is a proprietary application for Anubhav Life Care. For any modifications or issues, please
-contact the development team.
-
-## License
-
-© 2024 Anubhav Life Care. All rights reserved.
-
-## Support
-
-For technical support or feature requests, please contact:
-
-- Email: contact.anubhavlife@gmail.com
-- Phone: +91-9230755875
+- Phone: +91-9230755875 | +91-9230755870
 - WhatsApp: +91-9230755876
+- Email: contact.anubhavlife@gmail.com
+- Website: www.anubhavlifecare.in
+
+© Anubhav Life Care. All rights reserved.

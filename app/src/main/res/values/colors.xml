@@ -70,4 +70,10 @@
     <!-- Button gradient colors -->
     <color name="button_gradient_start">@color/brand_blue</color>
     <color name="button_gradient_end">#0E536C</color>
+
+    <!-- Admin booking-details screen: bright yellow / blue report pills, per the design. -->
+    <color name="admin_yellow">#F4C20D</color>
+    <color name="admin_yellow_text">#1A1A1A</color>
+    <color name="admin_blue">#1877F2</color>
+    <color name="admin_blue_text">#FFFFFF</color>
 </resources>
