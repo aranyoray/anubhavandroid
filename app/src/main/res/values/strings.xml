@@ -73,6 +73,8 @@
     <string name="settings_saved">Settings saved</string>
     <string name="clinic_registered_phone">Clinic registered mobile</string>
     <string name="clinic_phone_hint">Use the mobile number registered at the clinic</string>
+    <string name="enter_valid_mobile">Enter a valid 10-digit mobile number.</string>
+    <string name="enter_valid_mobile_bn">সঠিক ১০ সংখ্যার মোবাইল নম্বর দিন।</string>
     <string name="save_clinic_phone">Link mobile number</string>
     <string name="phone_linked">Mobile number linked</string>
     <string name="invalid_phone">Enter a valid 10 digit mobile number</string>

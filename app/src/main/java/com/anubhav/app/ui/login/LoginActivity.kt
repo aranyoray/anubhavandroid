@@ -1,11 +1,9 @@
 package com.anubhav.app.ui.login
 
-import android.app.DatePickerDialog
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.text.InputType
-import android.view.Gravity
 import android.view.View
 import android.widget.EditText
 import android.widget.ImageView
@@ -13,8 +11,6 @@ import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
-import java.util.Calendar
-import java.util.Locale
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -310,104 +306,36 @@ class LoginActivity : AppCompatActivity() {
         dialog.show()
     }
 
+    /**
+     * Phone login / sign-up — no bill number or date required. The phone number is the
+     * identity: an existing patient's name is filled in from the clinic record when the
+     * number matches one, and a number the clinic has never seen simply signs in so the
+     * person can start booking. Bills and reports are then shown for whatever this phone
+     * matches in AKTIV.
+     */
     private fun handlePhoneAuth() {
         hideInlineError()
-        val prefill = etClinicPhone.text?.toString()?.filter { it.isDigit() }.orEmpty().takeLast(10)
-        showClinicVerifyDialog(prefill)
-    }
-
-    /**
-     * AKTIV 2-of-3 verification (no OTP): patient enters Name, Bill No OR Bill Date, Phone.
-     * Any two matching a bill logs them in — so a wrong phone still works via name + bill.
-     * More secure than phone-only (a phone number alone shouldn't unlock someone's reports).
-     */
-    private fun showClinicVerifyDialog(prefillPhone: String) {
-        val d = (resources.displayMetrics.density)
-        fun px(v: Int) = (v * d).toInt()
-        val container = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(px(20), px(8), px(20), 0)
+        val phone = etClinicPhone.text?.toString()?.filter { it.isDigit() }.orEmpty().takeLast(10)
+        if (phone.length != 10) {
+            showInlineError(localized(R.string.enter_valid_mobile))
+            return
         }
-        val etName = EditText(this).apply {
-            hint = localized(R.string.verify_patient_name_hint)
-            inputType = InputType.TYPE_TEXT_FLAG_CAP_WORDS or InputType.TYPE_CLASS_TEXT
+        setLoading(true)
+        lifecycleScope.launch {
+            // Enrich with the clinic name when the number is known; never block on it, so a
+            // new number (or the clinic PC being offline) still signs in.
+            val name = customerRepo.getProfile(phone = phone, email = null).getOrNull()
+                ?.takeIf { it.found }?.patientName
+            CustomerSessionManager.save(
+                this@LoginActivity,
+                phone = phone,
+                email = null,
+                name = name,
+                firebaseUid = "phone-$phone",
+            )
+            setLoading(false)
+            openMain()
         }
-        val etPhone = EditText(this).apply {
-            hint = localized(R.string.verify_phone_hint); inputType = InputType.TYPE_CLASS_PHONE; setText(prefillPhone)
-        }
-        val etBill = EditText(this).apply {
-            hint = localized(R.string.verify_bill_no_hint); inputType = InputType.TYPE_CLASS_NUMBER
-        }
-        var billDateIso: String? = null
-        val dateBtn = com.google.android.material.button.MaterialButton(this).apply {
-            text = localized(R.string.verify_pick_bill_date)
-            setOnClickListener {
-                val c = Calendar.getInstance()
-                DatePickerDialog(this@LoginActivity, { _, y, m, day ->
-                    billDateIso = String.format(Locale.US, "%04d-%02d-%02d", y, m + 1, day)
-                    text = localized(
-                        R.string.verify_bill_date_value,
-                        String.format(Locale.US, "%02d/%02d/%04d", day, m + 1, y),
-                    )
-                }, c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH)).show()
-            }
-        }
-        container.addView(etName)
-        container.addView(etPhone)
-        container.addView(TextView(this).apply { text = localized(R.string.verify_bill_no_label); setPadding(0, px(8), 0, 0) })
-        container.addView(etBill)
-        container.addView(TextView(this).apply { text = localized(R.string.verify_or_divider); gravity = Gravity.CENTER; setPadding(0, px(6), 0, px(6)) })
-        container.addView(dateBtn)
-
-        val dialog = AlertDialog.Builder(this)
-            .setTitle(localized(R.string.verify_dialog_title_login))
-            .setMessage(localized(R.string.verify_dialog_message))
-            .setView(container)
-            .setPositiveButton(localized(R.string.verify_positive_view), null)
-            .setNegativeButton(localized(R.string.cancel), null)
-            .create()
-        dialog.setOnShowListener {
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val name = etName.text.toString().trim()
-                val phone = etPhone.text.toString().trim()
-                val bill = etBill.text.toString().trim()
-                val provided = listOf(name.isNotEmpty(), bill.isNotEmpty() || billDateIso != null, phone.isNotEmpty()).count { it }
-                if (provided < 2) {
-                    Toast.makeText(this, localized(R.string.verify_fill_two_fields), Toast.LENGTH_SHORT).show()
-                    return@setOnClickListener
-                }
-                setLoading(true)
-                lifecycleScope.launch {
-                    customerRepo.verify(name, phone, bill, billDateIso).fold(
-                        onSuccess = { r ->
-                            setLoading(false)
-                            if (r.matched && r.phone.isNotBlank()) {
-                                CustomerSessionManager.save(
-                                    this@LoginActivity,
-                                    phone = r.phone,
-                                    email = null,
-                                    name = r.patientName,
-                                    firebaseUid = "clinic-verify-${r.phone}",
-                                )
-                                dialog.dismiss()
-                                openMain()
-                            } else {
-                                Toast.makeText(
-                                    this@LoginActivity,
-                                    localized(R.string.verify_no_match),
-                                    Toast.LENGTH_LONG,
-                                ).show()
-                            }
-                        },
-                        onFailure = { err ->
-                            setLoading(false)
-                            Toast.makeText(this@LoginActivity, err.localizedMessage ?: localized(R.string.network_error), Toast.LENGTH_LONG).show()
-                        },
-                    )
-                }
-            }
-        }
-        dialog.show()
     }
 
     private fun handleEmailAuth() {
