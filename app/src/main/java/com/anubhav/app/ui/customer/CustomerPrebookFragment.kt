@@ -34,6 +34,9 @@ import com.anubhav.app.utils.localized
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
+import com.google.android.material.datepicker.CalendarConstraints
+import com.google.android.material.datepicker.DateValidatorPointForward
+import com.google.android.material.datepicker.MaterialDatePicker
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import com.google.gson.Gson
@@ -43,6 +46,11 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+import java.util.TimeZone
 
 class CustomerPrebookFragment : Fragment(), PaymentResultListener {
     private companion object {
@@ -109,7 +117,7 @@ class CustomerPrebookFragment : Fragment(), PaymentResultListener {
         val etName = view.findViewById<TextInputEditText>(R.id.etPatientName)
         val etAge = view.findViewById<TextInputEditText>(R.id.etAgeYear)
         val spinnerSex = view.findViewById<AutoCompleteTextView>(R.id.spinnerSex)
-        val spinnerDate = view.findViewById<AutoCompleteTextView>(R.id.spinnerDate)
+        val btnDate = view.findViewById<MaterialButton>(R.id.btnDate)
         val spinnerSlot = view.findViewById<AutoCompleteTextView>(R.id.spinnerSlot)
         val btnUseLocation = view.findViewById<MaterialButton>(R.id.btnUseLocation)
         val btnPickOnMap = view.findViewById<MaterialButton>(R.id.btnPickOnMap)
@@ -126,6 +134,9 @@ class CustomerPrebookFragment : Fragment(), PaymentResultListener {
         val progress = view.findViewById<ProgressBar>(R.id.progressBar)
 
         view.findViewById<TextView>(R.id.tvPrebookTitle).text = localized(R.string.prebook_time_slot)
+        view.findViewById<TextView>(R.id.tvPatientSection).text = localized(R.string.booking_patient_details)
+        view.findViewById<TextView>(R.id.tvScheduleSection).text = localized(R.string.booking_schedule)
+        view.findViewById<TextView>(R.id.tvTestsSection).text = localized(R.string.booking_choose_tests)
         searchLayout.hint = localized(R.string.booking_test_search_hint)
         tvPolicy.text = localized(R.string.prebook_policy, getString(R.string.reschedule_phone))
         btnPay.text = localized(R.string.pay_advance)
@@ -146,7 +157,6 @@ class CustomerPrebookFragment : Fragment(), PaymentResultListener {
         // These fields are read-only pickers (inputType="none"); make a single tap
         // reliably open the dropdown instead of just focusing the field.
         spinnerSex.setOnClickListener { spinnerSex.showDropDown() }
-        spinnerDate.setOnClickListener { spinnerDate.showDropDown() }
         spinnerSlot.setOnClickListener { spinnerSlot.showDropDown() }
 
         btnUseLocation.text = localized(R.string.use_my_location)
@@ -182,7 +192,7 @@ class CustomerPrebookFragment : Fragment(), PaymentResultListener {
         rvTests.layoutManager = LinearLayoutManager(requireContext())
         rvTests.adapter = testAdapter
         updateTotals(tvSelected, selectedChips, tvTotal, tvAdvance)
-        loadCalendar(progress, spinnerDate, spinnerSlot, tvPolicy)
+        loadCalendar(progress, btnDate, spinnerSlot, tvPolicy)
         searchTests("", tvSearchStatus, rvTests)
 
         etSearch.addTextChangedListener(
@@ -339,7 +349,7 @@ class CustomerPrebookFragment : Fragment(), PaymentResultListener {
 
     private fun loadCalendar(
         progress: ProgressBar,
-        spinnerDate: AutoCompleteTextView,
+        btnDate: MaterialButton,
         spinnerSlot: AutoCompleteTextView,
         tvPolicy: TextView,
     ) {
@@ -348,7 +358,7 @@ class CustomerPrebookFragment : Fragment(), PaymentResultListener {
             customerRepo.getPrebookCalendar().fold(
                 onSuccess = { calendar ->
                     tvPolicy.text = localized(R.string.prebook_policy, calendar.reschedulePhone)
-                    bindCalendar(calendar, spinnerDate, spinnerSlot)
+                    bindCalendar(calendar, btnDate, spinnerSlot)
                     progress.visibility = View.GONE
                 },
                 onFailure = {
@@ -361,27 +371,43 @@ class CustomerPrebookFragment : Fragment(), PaymentResultListener {
 
     private fun bindCalendar(
         calendar: PrebookCalendar,
-        spinnerDate: AutoCompleteTextView,
+        btnDate: MaterialButton,
         spinnerSlot: AutoCompleteTextView,
     ) {
-        val dateLabels = calendar.dates.map { it.date }
-        spinnerDate.setAdapter(
-            ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, dateLabels),
-        )
-        spinnerDate.setOnItemClickListener { parent, _, position, _ ->
-            // Resolve by the clicked label rather than the index: the adapter filters as
-            // soon as text is set, after which `position` no longer indexes calendar.dates.
-            val label = parent.getItemAtPosition(position) as? String
-            val date = calendar.dates.firstOrNull { it.date == label } ?: return@setOnItemClickListener
-            selectedSlot = null
-            spinnerSlot.setText("", false)
-            bindSlotsFor(date, spinnerSlot)
+        val availableDates = calendar.dates.associateBy { it.date }
+        val first = calendar.dates.firstOrNull() ?: return
+        val last = calendar.dates.last()
+        fun utcMillis(iso: String) = LocalDate.parse(iso).toEpochDay() * 86_400_000L
+        fun displayDate(iso: String) = LocalDate.parse(iso)
+            .format(DateTimeFormatter.ofPattern("EEE, d MMM yyyy", Locale.getDefault()))
+        btnDate.text = selectedDate?.let(::displayDate) ?: localized(R.string.prebook_date_hint)
+        btnDate.setOnClickListener {
+            val constraints = CalendarConstraints.Builder()
+                .setStart(utcMillis(first.date))
+                .setEnd(utcMillis(last.date))
+                .setValidator(DateValidatorPointForward.from(utcMillis(first.date)))
+                .build()
+            val picker = MaterialDatePicker.Builder.datePicker()
+                .setTitleText(localized(R.string.prebook_date_hint))
+                .setCalendarConstraints(constraints)
+                .setSelection(utcMillis(selectedDate ?: first.date))
+                .build()
+            picker.addOnPositiveButtonClickListener { millis ->
+                val iso = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
+                    timeZone = TimeZone.getTimeZone("UTC")
+                }.format(millis)
+                val date = availableDates[iso] ?: return@addOnPositiveButtonClickListener
+                selectedSlot = null
+                spinnerSlot.setText("", false)
+                btnDate.text = displayDate(iso)
+                bindSlotsFor(date, spinnerSlot)
+            }
+            picker.show(parentFragmentManager, "prebook_date")
         }
 
         // A restored selection (rotation, or coming back from Razorpay) needs its slot
         // list rebuilt, otherwise the date shows but the slot dropdown is empty.
         calendar.dates.firstOrNull { it.date == selectedDate }?.let { date ->
-            spinnerDate.setText(date.date, false)
             bindSlotsFor(date, spinnerSlot, keepSelection = true)
         }
     }

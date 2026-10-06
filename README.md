@@ -9,7 +9,7 @@ small FastAPI service that connects it to the clinic's AKTIV billing system.
 |------|------------|
 | `app/` | Android app (Kotlin, `com.anubhav.app`) |
 | `api/` | FastAPI service the app talks to (`api/main.py`) |
-| `api/tests/` | Unit tests for the API (`python -m pytest api/tests`) |
+| `api/tests/` | Unit tests for the API (`python -m unittest discover -s api/tests`) |
 | `etl/sync.py` | Batch copy of AKTIV SQL Server tables into Neon Postgres |
 | `scripts/` | One-off schema inspection helpers |
 | `docs/` | Play Console notes |
@@ -27,9 +27,10 @@ small FastAPI service that connects it to the clinic's AKTIV billing system.
   (test counts and bill lookup for everyone; income/CC/due for account rights; new
   booking, edit and cancel for booking, BILLCHANGE and cancel rights). The server checks
   the same roles on every call (`api/roles.py`, `X-Staff-Token`).
-- **Book a test** — search the catalog, pick a prebook date (10th / 20th / 30th) and time
-  slot, optionally geotag the home-collection address (GPS or an offline Leaflet map
-  picker), and pay the 50% advance through Razorpay.
+- **Book a test** — search the catalog, pick an available date in the calendar and time
+  slot, optionally add a collection address or map pin, and pay the 50% test advance
+  through Razorpay. The separate **Home Collection** action opens a prefilled WhatsApp
+  request to the clinic; the pickup itself requires no payment.
 - **My bookings / Pending payments** — bills from AKTIV with outstanding balance, payable
   in-app.
 - **My reports** — every visit under the patient's phone; the collated report PDF is
@@ -78,6 +79,7 @@ show what it has already cached on the phone (report lists and PDFs a patient ha
 
    ```properties
    AKTIV_API_URL=https://api.anubhavlifecare.in/     # default; use http://192.168.29.157:8080/ on the clinic LAN
+   AKTIV_API_KEY=your-shared-app-key                # must match the API server
    RAZORPAY_KEY_ID=rzp_live_xxxxxxxx                 # payments are disabled when blank
    ```
 
@@ -116,3 +118,20 @@ schedule from the clinic PC; the tables must already exist in Neon.
 - Website: www.anubhavlifecare.in
 
 © Anubhav Life Care. All rights reserved.
+
+## Login and report fixes: local testing
+
+Build a test APK with `./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug`.
+The installable output is `app/build/outputs/apk/debug/app-debug.apk`. A debug APK uses a
+different signing certificate from the published release, so Android may require removing
+the release app before installing this test build. Removing the app erases its local data.
+Google sign-in requires registering the test certificate in Firebase; clinic verification
+and AKTIV staff login use the API instead.
+
+The API changes must be deployed separately from the APK. Set `AKTIV_TOKEN_SECRET` to a
+random server-only value distinct from `AKTIV_API_KEY` before starting the updated API.
+The shared key inside the APK is no longer accepted as a token signing secret. Changing
+the token secret requires patients to verify again and staff to sign in again.
+
+Run backend regressions with `python -m unittest discover -s api/tests` after installing
+`api/requirements.txt`. Tests use synthetic data and mock database connections.

@@ -11,9 +11,9 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingStart="16dp"
-        android:paddingTop="16dp"
-        android:paddingEnd="16dp"
+        android:paddingStart="20dp"
+        android:paddingTop="20dp"
+        android:paddingEnd="20dp"
         android:paddingBottom="112dp">
 
         <TextView
@@ -30,15 +30,25 @@
             android:id="@+id/tvPrebookPolicy"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
+            android:layout_marginBottom="20dp"
             android:textColor="@color/text_secondary"
             android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/tvPatientSection"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:text="@string/booking_patient_details"
+            android:textColor="@color/brand_dark_blue"
+            android:textSize="17sp"
+            android:textStyle="bold" />
 
         <com.google.android.material.textfield.TextInputLayout
             style="@style/Widget.Anubhav.TextInput"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
+            android:layout_marginBottom="12dp"
             android:hint="@string/name">
 
             <com.google.android.material.textfield.TextInputEditText
@@ -51,7 +61,7 @@
             style="@style/Widget.Anubhav.TextInput"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
+            android:layout_marginBottom="12dp"
             android:hint="@string/patient_age">
 
             <com.google.android.material.textfield.TextInputEditText
@@ -65,7 +75,7 @@
             style="@style/Widget.Anubhav.TextInput"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
+            android:layout_marginBottom="12dp"
             android:hint="@string/patient_sex"
             app:endIconMode="dropdown_menu">
 
@@ -99,7 +109,7 @@
             android:text="@string/pick_on_map"
             android:maxLines="1"
             android:ellipsize="end"
-            app:cornerRadius="10dp"
+            app:cornerRadius="16dp"
             app:icon="@drawable/ic_map_pin"
             app:iconGravity="textStart"
             app:iconTint="@color/text_white" />
@@ -129,28 +139,37 @@
             android:text="@string/use_my_location"
             android:maxLines="1"
             android:ellipsize="end"
-            app:cornerRadius="10dp" />
+            app:cornerRadius="16dp" />
 
-        <com.google.android.material.textfield.TextInputLayout
-            style="@style/Widget.Anubhav.TextInput"
+        <TextView
+            android:id="@+id/tvScheduleSection"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:layout_marginBottom="12dp"
+            android:text="@string/booking_schedule"
+            android:textColor="@color/brand_dark_blue"
+            android:textSize="17sp"
+            android:textStyle="bold" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnDate"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="8dp"
-            android:hint="@string/prebook_date_hint"
-            app:endIconMode="dropdown_menu">
-
-            <AutoCompleteTextView
-                android:id="@+id/spinnerDate"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:inputType="none" />
-        </com.google.android.material.textfield.TextInputLayout>
+            android:minHeight="56dp"
+            android:text="@string/prebook_date_hint"
+            android:textAlignment="viewStart"
+            app:cornerRadius="16dp"
+            app:icon="@drawable/ic_calendar_check"
+            app:iconGravity="textStart" />
 
         <com.google.android.material.textfield.TextInputLayout
             style="@style/Widget.Anubhav.TextInput"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
+            android:layout_marginBottom="18dp"
             android:hint="@string/preferred_time"
             app:endIconMode="dropdown_menu">
 
@@ -160,6 +179,16 @@
                 android:layout_height="wrap_content"
                 android:inputType="none" />
         </com.google.android.material.textfield.TextInputLayout>
+
+        <TextView
+            android:id="@+id/tvTestsSection"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:text="@string/booking_choose_tests"
+            android:textColor="@color/brand_dark_blue"
+            android:textSize="17sp"
+            android:textStyle="bold" />
 
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/layoutTestSearch"
@@ -219,6 +248,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="4dp"
+            android:background="@drawable/chip_success_soft_bg"
+            android:padding="12dp"
             android:textStyle="bold"
             android:maxLines="1"
             android:ellipsize="end" />
@@ -240,7 +271,8 @@
             android:text="@string/pay_advance"
             android:maxLines="1"
             android:ellipsize="end"
-            app:cornerRadius="10dp" />
+            android:minHeight="56dp"
+            app:cornerRadius="16dp" />
 
         <ProgressBar
             android:id="@+id/progressBar"

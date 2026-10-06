@@ -11,7 +11,7 @@ from config import mssql_config, neon_url
 
 @contextlib.contextmanager
 def neon_conn():
-    conn = psycopg2.connect(neon_url())
+    conn = psycopg2.connect(neon_url(), connect_timeout=5, options="-c statement_timeout=15000")
     try:
         yield conn
     finally:
@@ -28,6 +28,8 @@ def mssql_conn():
         password=cfg["password"],
         database=cfg["database"],
         tds_version=cfg["tds_version"],
+        login_timeout=5,
+        timeout=15,
         autocommit=False,
     )
     try:

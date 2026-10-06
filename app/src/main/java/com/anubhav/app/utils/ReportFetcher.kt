@@ -9,6 +9,8 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
+import java.io.IOException
+import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
 /**
@@ -18,18 +20,26 @@ import java.util.concurrent.TimeUnit
  * A cached copy is reused (works offline / while the clinic server is off, midnight–7 AM).
  */
 object ReportFetcher {
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(90, TimeUnit.SECONDS)
-        .build()
-
-    fun cachedFile(context: Context, billKey: Int): File {
+    fun cachedFile(context: Context, billKey: Int, phone: String, viewUrl: String?): File {
         val dir = File(context.filesDir, "saved_reports").apply { mkdirs() }
-        return File(dir, "bill_$billKey.pdf")
+        // A bill may gain more authorised reports later. Its view link describes the
+        // report set, so a previously downloaded subset must not shadow the new PDF.
+        val identity = "${phone.filter(Char::isDigit).takeLast(10)}|${viewUrl.orEmpty()}"
+        val version = MessageDigest.getInstance("SHA-256").digest(identity.toByteArray())
+            .joinToString("") { "%02x".format(it) }
+        return File(dir, "bill_${billKey}_$version.pdf")
     }
 
-    fun isCached(context: Context, billKey: Int): Boolean =
-        cachedFile(context, billKey).let { it.exists() && it.length() > 0L }
+    fun isCached(context: Context, billKey: Int, phone: String, viewUrl: String?): Boolean =
+        isPdf(cachedFile(context, billKey, phone, viewUrl))
+
+    private fun isPdf(file: File): Boolean = runCatching {
+        file.inputStream().buffered().use { input ->
+            val header = ByteArray(5)
+            java.io.DataInputStream(input).readFully(header)
+            header.contentEquals("%PDF-".toByteArray())
+        }
+    }.getOrDefault(false)
 
     /** Refused by the server for this patient (token missing/expired/other phone). */
     class NotAllowed(val code: Int) : Exception("HTTP $code")
@@ -37,24 +47,27 @@ object ReportFetcher {
     /**
      * Download+cache the bill's reports as one PDF if not already cached. Returns the local file.
      *
-     * First choice is the API's `report-pdf`, which checks the patient token, fetches each
-     * authorised report separately and merges only the ones that rendered - so one broken
-     * report no longer spoils the whole file. If that fails for any reason other than a
-     * refusal, the print page's own collated link ([viewUrl]) is tried as before.
+     * The API checks the patient token and returns a complete, validated PDF. The
+     * report set in [viewUrl] versions the local copy. Refresh older copies online;
+     * retain a valid copy during outages, but propagate authorization failures.
      */
     suspend fun download(context: Context, billKey: Int, phone: String, viewUrl: String?): File =
         withContext(Dispatchers.IO) {
-            val file = cachedFile(context, billKey)
-            if (file.exists() && file.length() > 0L) return@withContext file
+            if (!PatientTokens.has(phone)) throw NotAllowed(401)
+            val file = cachedFile(context, billKey, phone, viewUrl)
+            val cached = isPdf(file)
+            val age = System.currentTimeMillis() - file.lastModified()
+            if (cached && age in 0..TimeUnit.MINUTES.toMillis(15)) return@withContext file
             val apiUrl = AktivApiClient.url("api/customer/report-pdf") +
                 "?bill_key=$billKey&phone=${java.net.URLEncoder.encode(phone, "UTF-8")}"
             try {
                 fetchTo(AktivApiClient.httpClient, apiUrl, file)
             } catch (e: NotAllowed) {
                 throw e
-            } catch (e: Exception) {
-                if (viewUrl.isNullOrBlank()) throw e
-                fetchTo(client, viewUrl, file)
+            } catch (e: IOException) {
+                // Saved reports remain available during a network/origin outage. A
+                // server refusal above must still reach the re-verification UI.
+                if (!cached) throw e
             }
             file
         }
@@ -67,27 +80,14 @@ object ReportFetcher {
         try {
             http.newCall(req).execute().use { resp ->
                 if (resp.code == 401 || resp.code == 403) throw NotAllowed(resp.code)
+                if (resp.code >= 500) throw IOException("HTTP ${resp.code}")
                 if (!resp.isSuccessful) error("HTTP ${resp.code}")
                 val body = resp.body ?: error("empty response")
                 tmp.outputStream().use { out -> body.byteStream().use { it.copyTo(out) } }
                 // Guard against caching a 200-but-not-a-PDF payload (e.g. a Cloudflare
                 // tunnel/origin HTML error page). Such a file would poison the cache
                 // permanently because isCached()/the early return key only on size.
-                val header = ByteArray(5)
-                val read = tmp.inputStream().use { stream ->
-                    // A single read() may return fewer bytes than asked for, which
-                    // would reject a perfectly good PDF.
-                    var total = 0
-                    while (total < header.size) {
-                        val n = stream.read(header, total, header.size - total)
-                        if (n <= 0) break
-                        total += n
-                    }
-                    total
-                }
-                if (read < header.size || !header.decodeToString().startsWith("%PDF-")) {
-                    error("not a PDF")
-                }
+                if (!isPdf(tmp)) throw IOException("The server did not return a PDF")
                 // renameTo can fail across filesystems; fall back to a copy so the
                 // returned File always exists.
                 if (!tmp.renameTo(file)) tmp.copyTo(file, overwrite = true)

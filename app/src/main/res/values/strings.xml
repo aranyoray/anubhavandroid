@@ -138,6 +138,7 @@
     <string name="whatsapp_label">WhatsApp: +91-9230755876</string>
     <string name="email_label">Email: contact.anubhavlife@gmail.com</string>
     <string name="home_collection_info">Free home collection available!\nCall +91-9230755876 or use WhatsApp</string>
+    <string name="home_collection_whatsapp_message">Hello, I would like to request free home sample collection.\nName: %1$s\nPhone: %2$s\nAddress: \nPreferred date and time: \nTests needed: </string>
 
     <!-- Booking Screen -->
     <string name="book_test_header">Book Your Test Online</string>
@@ -204,7 +205,10 @@
     <string name="time_slot_evening">4 PM – 7 PM</string>
 
     <!-- Customer flows -->
-    <string name="prebook_date_hint">Date (10th, 20th or 30th only)</string>
+    <string name="prebook_date_hint">Choose a date</string>
+    <string name="booking_patient_details">Patient details</string>
+    <string name="booking_schedule">Date and time</string>
+    <string name="booking_choose_tests">Choose tests</string>
     <string name="prebook_policy">50%% advance is non-refundable. Reschedule only by calling %1$s.</string>
     <string name="no_tests_selected">No tests selected — search and tap tests above</string>
     <string name="total_amount_value">Total: ₹%1$.0f</string>
@@ -469,6 +473,7 @@
     <string name="whatsapp_label_bn">হোয়াটসঅ্যাপ: +91-9230755876</string>
     <string name="email_label_bn">ইমেল: contact.anubhavlife@gmail.com</string>
     <string name="home_collection_info_bn">হোম কালেকশন একদম ফ্রি!\n+91-9230755876 নম্বরে ফোন বা হোয়াটসঅ্যাপ করুন</string>
+    <string name="home_collection_whatsapp_message_bn">নমস্কার, আমি বিনামূল্যে বাড়ি থেকে স্যাম্পেল সংগ্রহের অনুরোধ করছি।\nনাম: %1$s\nফোন: %2$s\nঠিকানা: \nপছন্দের তারিখ ও সময়: \nপ্রয়োজনীয় টেস্ট: </string>
 
     <string name="book_test_header_bn">অনলাইনে আপনার টেস্ট বুক করুন</string>
     <string name="book_test_description_bn">১৫০০-রও বেশি টেস্ট থেকে বেছে নিন, সঙ্গে বাড়িতে এসে স্যাম্পেল নেওয়ার সুবিধা</string>
@@ -512,7 +517,10 @@
     <string name="metrics_disclaimer_bn">এই তথ্য শুধুমাত্র সাধারণ জ্ঞানের জন্য, কোনো রোগ নির্ণয় নয়। রেফারেন্স মাত্রা ল্যাব ভেদে আলাদা হতে পারে — সবসময় নিজের রিপোর্টের মাত্রা দেখুন এবং ফলাফল নিয়ে ডাক্তারের সঙ্গে পরামর্শ করুন।</string>
     <string name="payment_recorded_contact_support_bn">পেমেন্ট জমা পড়েছে (ID %1$s), কিন্তু বুকিংটা আপনা-আপনি সম্পূর্ণ হয়নি। অনুগ্রহ করে এই পেমেন্ট ID জানিয়ে সাপোর্টে যোগাযোগ করুন।</string>
 
-    <string name="prebook_date_hint_bn">তারিখ (শুধু ১০, ২০ বা ৩০ তারিখ)</string>
+    <string name="prebook_date_hint_bn">তারিখ বেছে নিন</string>
+    <string name="booking_patient_details_bn">রোগীর তথ্য</string>
+    <string name="booking_schedule_bn">তারিখ ও সময়</string>
+    <string name="booking_choose_tests_bn">টেস্ট বেছে নিন</string>
     <string name="prebook_policy_bn">৫০%% অ্যাডভান্স ফেরত হয় না। দিন বদলাতে হলে শুধু %1$s নম্বরে ফোন করুন।</string>
     <string name="no_tests_selected_bn">এখনও কোনো টেস্ট বাছা হয়নি — উপরে খুঁজে টেস্টে ট্যাপ করুন</string>
     <string name="total_amount_value_bn">মোট: ₹%1$.0f</string>

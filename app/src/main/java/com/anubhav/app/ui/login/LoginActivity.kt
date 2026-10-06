@@ -45,6 +45,7 @@ import com.google.android.material.textfield.TextInputLayout
 import com.google.firebase.auth.FacebookAuthProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
@@ -107,7 +108,7 @@ class LoginActivity : AppCompatActivity() {
         setContentView(R.layout.activity_login)
         bindViews()
         setupGoogleSignIn()
-        setupFacebookLogin()
+        if (isFacebookConfigured()) setupFacebookLogin()
         setupLanguageSelection()
         setupLoginUi()
 
@@ -303,7 +304,7 @@ class LoginActivity : AppCompatActivity() {
                         onFailure = { err ->
                             setLoading(false)
                             signIn.isEnabled = true
-                            val message = if (AdminRepository.statusOf(err) == 401) {
+                            val message = AdminRepository.messageOf(err) ?: if (AdminRepository.statusOf(err) == 401) {
                                 localized(R.string.admin_wrong_password)
                             } else {
                                 localized(R.string.network_error)
@@ -369,51 +370,63 @@ class LoginActivity : AppCompatActivity() {
             .setPositiveButton(localized(R.string.verify_positive_view), null)
             .setNegativeButton(localized(R.string.cancel), null)
             .create()
-        dialog.show()
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-            val name = etName.text?.toString()?.trim().orEmpty()
-            val phone = etPhone.text?.toString()?.trim().orEmpty()
-            val bill = etBill.text?.toString()?.trim().orEmpty()
-            if (bill.isNotEmpty() && bill.length < 3) {
-                etBill.error = localized(R.string.verify_bill_digits_required)
-                return@setOnClickListener
-            }
-            val provided = listOf(name.isNotEmpty(), bill.isNotEmpty() || billDateIso != null, phone.isNotEmpty()).count { it }
-            if (provided < 2) {
-                Toast.makeText(this, localized(R.string.verify_fill_two_fields), Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-            val submit = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-            submit.isEnabled = false
-            setLoading(true)
-            lifecycleScope.launch {
-                customerRepo.verify(name, phone, bill, billDateIso).fold(
-                    onSuccess = { r ->
-                        setLoading(false)
-                        if (r.matched && r.phone.isNotBlank()) {
-                            PatientTokens.save(r.phone, r.token)
-                            CustomerSessionManager.save(
-                                this@LoginActivity,
-                                phone = r.phone,
-                                email = null,
-                                name = r.patientName,
-                                firebaseUid = "clinic-verify-${r.phone}",
-                            )
-                            dialog.dismiss()
-                            openMain()
-                        } else {
-                            submit.isEnabled = true
-                            Toast.makeText(this@LoginActivity, localized(R.string.verify_no_match), Toast.LENGTH_LONG).show()
-                        }
-                    },
-                    onFailure = { err ->
-                        setLoading(false)
-                        submit.isEnabled = true
-                        Toast.makeText(this@LoginActivity, err.localizedMessage ?: localized(R.string.network_error), Toast.LENGTH_LONG).show()
-                    },
-                )
+        dialog.setOnShowListener {
+            val verifyButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+            verifyButton.setOnClickListener {
+                val name = etName.text.toString().trim()
+                val phone = etPhone.text.toString().trim()
+                val bill = etBill.text.toString().trim()
+                if (bill.isNotEmpty() && bill.length < 3) {
+                    etBill.error = localized(R.string.verify_bill_digits_required)
+                    return@setOnClickListener
+                }
+                val provided = listOf(name.isNotEmpty(), bill.isNotEmpty() || billDateIso != null, phone.isNotEmpty()).count { it }
+                if (provided < 2) {
+                    Toast.makeText(this, localized(R.string.verify_fill_two_fields), Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                verifyButton.isEnabled = false
+                dialog.setCancelable(false)
+                dialog.getButton(AlertDialog.BUTTON_NEGATIVE).isEnabled = false
+                setLoading(true)
+                lifecycleScope.launch {
+                    customerRepo.verify(name, phone, bill, billDateIso).fold(
+                        onSuccess = { r ->
+                            verifyButton.isEnabled = true
+                            dialog.setCancelable(true)
+                            dialog.getButton(AlertDialog.BUTTON_NEGATIVE).isEnabled = true
+                            setLoading(false)
+                            if (r.matched && r.phone.isNotBlank()) {
+                                PatientTokens.save(r.phone, r.token)
+                                CustomerSessionManager.save(
+                                    this@LoginActivity,
+                                    phone = r.phone,
+                                    email = null,
+                                    name = r.patientName,
+                                    firebaseUid = "clinic-verify-${r.phone}",
+                                )
+                                dialog.dismiss()
+                                openMain()
+                            } else {
+                                Toast.makeText(
+                                    this@LoginActivity,
+                                    localized(R.string.verify_no_match),
+                                    Toast.LENGTH_LONG,
+                                ).show()
+                            }
+                        },
+                        onFailure = { err ->
+                            setLoading(false)
+                            verifyButton.isEnabled = true
+                            dialog.setCancelable(true)
+                            dialog.getButton(AlertDialog.BUTTON_NEGATIVE).isEnabled = true
+                            Toast.makeText(this@LoginActivity, AdminRepository.messageOf(err) ?: err.localizedMessage ?: localized(R.string.network_error), Toast.LENGTH_LONG).show()
+                        },
+                    )
+                }
             }
         }
+        dialog.show()
     }
 
     private fun handleEmailAuth() {
@@ -439,6 +452,8 @@ class LoginActivity : AppCompatActivity() {
                     auth.signInWithEmailAndPassword(email, password).await()
                 }
                 completeFirebaseLogin(result.user?.email, result.user?.displayName, result.user?.uid ?: "")
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 setLoading(false)
                 showInlineError(e.localizedMessage ?: localized(if (isSignUpMode) R.string.sign_up_failed else R.string.login_failed))
@@ -453,6 +468,8 @@ class LoginActivity : AppCompatActivity() {
                 val credential = GoogleAuthProvider.getCredential(idToken, null)
                 val result = auth.signInWithCredential(credential).await()
                 completeFirebaseLogin(result.user?.email, result.user?.displayName, result.user?.uid ?: "")
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 setLoading(false)
                 showInlineError(e.localizedMessage ?: localized(R.string.login_failed))
@@ -467,6 +484,8 @@ class LoginActivity : AppCompatActivity() {
                 val credential = FacebookAuthProvider.getCredential(token)
                 val result = auth.signInWithCredential(credential).await()
                 completeFirebaseLogin(result.user?.email, result.user?.displayName, result.user?.uid ?: "")
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 setLoading(false)
                 showInlineError(e.localizedMessage ?: localized(R.string.login_failed))
@@ -500,6 +519,8 @@ class LoginActivity : AppCompatActivity() {
             )
             setLoading(false)
             openMain()
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             setLoading(false)
             // Allow login even if AKTIV lookup fails — user can still browse

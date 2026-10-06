@@ -40,7 +40,7 @@ from collector_portal import (
     list_collector_reports,
 )
 from patient_match import _norm_phone, customer_history, verify_customer
-from report_pdf import collated_report_pdf
+from report_pdf import ReportUnavailable, collated_report_pdf
 from report_values import report_values
 from staff_portal import bill_detail, edit_bill, search_bills
 import analytics
@@ -49,6 +49,12 @@ import tokens
 
 app = FastAPI(title="Anubhav Life Care API", version="2.0.0")
 logger = logging.getLogger(__name__)
+
+
+@app.exception_handler(tokens.TokenConfigurationError)
+async def token_configuration_error(request: Request, exc: tokens.TokenConfigurationError):
+    logger.error("Session signing configuration is missing: %s", exc)
+    return JSONResponse(status_code=503, content={"detail": "Sign-in is temporarily unavailable. Please contact the clinic."})
 
 
 def internal_error(exc: Exception) -> HTTPException:
@@ -435,6 +441,8 @@ def api_customer_report_pdf(bill_key: int, phone: str, x_patient_token: str = PA
     ph = require_patient(x_patient_token, phone)
     try:
         data = collated_report_pdf(bill_key=bill_key, phone=ph)
+    except ReportUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except PermissionError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
     except ValueError as exc:
@@ -638,6 +646,8 @@ def api_staff_bill_pdf(bill_key: int, x_staff_token: str = STAFF_TOKEN):
     require_staff(x_staff_token)
     try:
         data = collated_report_pdf(bill_key=bill_key)
+    except ReportUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except Exception as exc:

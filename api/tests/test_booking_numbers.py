@@ -144,6 +144,16 @@ class PrebookTestResolutionTests(unittest.TestCase):
 
 
 class CalendarTests(unittest.TestCase):
+    def test_booking_dates_are_consecutive_including_month_boundaries(self):
+        with patch.object(customer_portal, "date") as fake_date:
+            fake_date.today.return_value = date(2026, 10, 29)
+            dates = customer_portal._upcoming_prebook_dates(months_ahead=1)
+        self.assertEqual(dates[:5], [
+            date(2026, 10, 29), date(2026, 10, 30), date(2026, 10, 31),
+            date(2026, 11, 1), date(2026, 11, 2),
+        ])
+        self.assertEqual(len(dates), 32)
+
     def test_calendar_counts_every_cell_from_one_query(self):
         d1 = date(2030, 1, 10)
         cur = _RecordingCursor([(d1, "MORNING", 30), (d1, "EVENING", 2)])

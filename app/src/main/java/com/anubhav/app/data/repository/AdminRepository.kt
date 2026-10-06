@@ -11,6 +11,7 @@ import com.anubhav.app.data.model.StaffBillDetail
 import com.anubhav.app.data.model.StaffBillEdit
 import com.anubhav.app.data.remote.AktivApiClient
 import com.anubhav.app.utils.StaffSession
+import com.anubhav.app.utils.apiResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Request
@@ -20,13 +21,16 @@ class AdminRepository(
     private val api: com.anubhav.app.data.remote.AdminApi = AktivApiClient.adminApi,
 ) {
     private suspend fun <T> io(block: suspend () -> T): Result<T> =
-        withContext(Dispatchers.IO) { runCatching { block() } }
+        withContext(Dispatchers.IO) { apiResult { block() } }
 
     private val token: String get() = StaffSession.current?.token.orEmpty()
 
     /** AKTIV user id + password; on success the session holds the user's token and rights. */
     suspend fun signIn(userid: String, password: String): Result<AktivLoginResponse> = io {
-        AktivApiClient.api.login(AktivLoginRequest(userid.trim(), password)).also { StaffSession.current = it }
+        AktivApiClient.api.login(AktivLoginRequest(userid.trim(), password)).also {
+            check(it.success && !it.token.isNullOrBlank()) { "The server did not return a staff session. Please update the API." }
+            StaffSession.current = it
+        }
     }
 
     suspend fun report(

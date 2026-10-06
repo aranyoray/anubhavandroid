@@ -30,6 +30,8 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import com.anubhav.app.utils.apiResult
 import java.util.Calendar
 import java.util.Locale
 
@@ -46,6 +48,7 @@ class MyReportsFragment : Fragment() {
     private lateinit var statusView: TextView
     /** The phone whose visits are on screen (the patient's own, or one verified via "Fetch another"). */
     private var shownPhone: String = ""
+    private var historyJob: Job? = null
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
 
@@ -69,6 +72,10 @@ class MyReportsFragment : Fragment() {
             setTextColor(0xFF6B7280.toInt()); textSize = 13f; setPadding(0, dp(6), 0, dp(6))
         }
         root.addView(statusView)
+        root.addView(Button(requireContext()).apply {
+            text = localized(R.string.refresh_from_aktiv); isAllCaps = false
+            setOnClickListener { if (shownPhone.isNotBlank()) loadHistory(shownPhone) }
+        })
         listContainer = LinearLayout(requireContext()).apply { orientation = LinearLayout.VERTICAL }
         root.addView(listContainer)
 
@@ -97,11 +104,12 @@ class MyReportsFragment : Fragment() {
     }
 
     private fun loadHistory(phone: String) {
+        historyJob?.cancel()
         shownPhone = phone
         statusView.text = localized(R.string.reports_loading)
         listContainer.removeAllViews()
-        viewLifecycleOwner.lifecycleScope.launch {
-            repo.getHistoryCached(requireContext(), phone).fold(
+        historyJob = viewLifecycleOwner.lifecycleScope.launch {
+            repo.getHistoryCached(requireContext(), phone, forceRefresh = true).fold(
                 onSuccess = { res ->
                     listContainer.removeAllViews()
                     if (res.visits.isEmpty()) {
@@ -113,8 +121,7 @@ class MyReportsFragment : Fragment() {
                     addFetchOtherButton()
                 },
                 onFailure = { err ->
-                    val code = (err as? retrofit2.HttpException)?.code()
-                    if (code == 401 || code == 403) {
+                    if (CustomerRepository.needsVerification(err)) {
                         PatientTokens.forget(phone)
                         showVerifyPrompt(phone)
                     } else {
@@ -185,13 +192,14 @@ class MyReportsFragment : Fragment() {
         }
         btn.isEnabled = false
         val original = btn.text
-        btn.text = if (ReportFetcher.isCached(requireContext(), v.billKey)) {
+        val reportPhone = shownPhone
+        btn.text = if (ReportFetcher.isCached(requireContext(), v.billKey, reportPhone, link)) {
             localized(R.string.reports_opening)
         } else {
             localized(R.string.reports_fetching)
         }
         viewLifecycleOwner.lifecycleScope.launch {
-            runCatching { ReportFetcher.download(requireContext(), v.billKey, shownPhone, link) }
+            apiResult { ReportFetcher.download(requireContext(), v.billKey, reportPhone, link) }
                 .onSuccess { file ->
                     btn.isEnabled = true; btn.text = original
                     runCatching { ReportFetcher.open(requireContext(), file) }
@@ -200,8 +208,8 @@ class MyReportsFragment : Fragment() {
                 .onFailure { err ->
                     btn.isEnabled = true; btn.text = original
                     if (err is ReportFetcher.NotAllowed) {
-                        PatientTokens.forget(shownPhone)
-                        showVerifyPrompt(shownPhone)
+                        PatientTokens.forget(reportPhone)
+                        if (shownPhone == reportPhone) showVerifyPrompt(reportPhone)
                     } else {
                         Toast.makeText(requireContext(), localized(R.string.reports_fetch_failed), Toast.LENGTH_LONG).show()
                     }
@@ -260,42 +268,48 @@ class MyReportsFragment : Fragment() {
             .setPositiveButton(localized(R.string.verify_positive_find), null)
             .setNegativeButton(localized(R.string.cancel), null)
             .create()
-        dialog.show()
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-            val name = etName.text?.toString()?.trim().orEmpty()
-            val phone = etPhone.text?.toString()?.trim().orEmpty()
-            val bill = etBill.text?.toString()?.trim().orEmpty()
-            if (bill.isNotEmpty() && bill.length < 3) {
-                etBill.error = localized(R.string.verify_bill_digits_required)
-                return@setOnClickListener
-            }
-            val provided = listOf(name.isNotEmpty(), bill.isNotEmpty() || billDateIso != null, phone.isNotEmpty()).count { it }
-            if (provided < 2) {
-                Toast.makeText(ctx, localized(R.string.verify_fill_two_fields), Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-            val submit = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-            submit.isEnabled = false
-            viewLifecycleOwner.lifecycleScope.launch {
-                repo.verify(name, phone, bill, billDateIso).fold(
-                    onSuccess = { r ->
-                        if (r.matched && r.phone.isNotBlank()) {
-                            PatientTokens.save(r.phone, r.token)
-                            dialog.dismiss()
-                            Toast.makeText(ctx, localized(R.string.verify_showing_reports_for, r.patientName), Toast.LENGTH_SHORT).show()
-                            loadHistory(r.phone)
-                        } else {
-                            submit.isEnabled = true
-                            Toast.makeText(ctx, localized(R.string.verify_no_match), Toast.LENGTH_LONG).show()
-                        }
-                    },
-                    onFailure = {
-                        submit.isEnabled = true
-                        Toast.makeText(ctx, localized(R.string.network_error), Toast.LENGTH_LONG).show()
-                    },
-                )
+        dialog.setOnShowListener {
+            val verifyButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+            verifyButton.setOnClickListener {
+                val name = etName.text.toString().trim()
+                val phone = etPhone.text.toString().trim()
+                val bill = etBill.text.toString().trim()
+                if (bill.isNotEmpty() && bill.length < 3) {
+                    etBill.error = localized(R.string.verify_bill_digits_required)
+                    return@setOnClickListener
+                }
+                val provided = listOf(name.isNotEmpty(), bill.isNotEmpty() || billDateIso != null, phone.isNotEmpty()).count { it }
+                if (provided < 2) { Toast.makeText(ctx, localized(R.string.verify_fill_two_fields), Toast.LENGTH_SHORT).show(); return@setOnClickListener }
+                verifyButton.isEnabled = false
+                dialog.setCancelable(false)
+                dialog.getButton(AlertDialog.BUTTON_NEGATIVE).isEnabled = false
+                viewLifecycleOwner.lifecycleScope.launch {
+                    repo.verify(name, phone, bill, billDateIso).fold(
+                        onSuccess = { r ->
+                            verifyButton.isEnabled = true
+                            dialog.setCancelable(true)
+                            dialog.getButton(AlertDialog.BUTTON_NEGATIVE).isEnabled = true
+                            if (r.matched && r.phone.isNotBlank()) {
+                                PatientTokens.save(r.phone, r.token)
+                                dialog.dismiss()
+                                Toast.makeText(ctx, localized(R.string.verify_showing_reports_for, r.patientName), Toast.LENGTH_SHORT).show()
+                                // show that person's full history, fresh (the old list may be another number's)
+                                loadHistory(r.phone)
+                            } else {
+                                Toast.makeText(ctx, localized(R.string.verify_no_match), Toast.LENGTH_LONG).show()
+                            }
+                        },
+                        onFailure = {
+                            verifyButton.isEnabled = true
+                            dialog.setCancelable(true)
+                            dialog.getButton(AlertDialog.BUTTON_NEGATIVE).isEnabled = true
+                            Toast.makeText(ctx, it.message ?: localized(R.string.network_error), Toast.LENGTH_LONG).show()
+                        },
+                    )
+                }
             }
         }
+        dialog.show()
     }
 
     private companion object {

@@ -8,9 +8,8 @@ from typing import Any
 from aktiv_booking import _next_key, _resolve_tests, push_booking
 from config import aktiv_settings
 from db import fetch_all, mssql_conn, neon_conn
-from patient_match import build_view_link
+from patient_match import _norm_phone, build_view_link, mssql_phone10
 
-PREBOOK_DAYS = (10, 20, 30)
 TIME_SLOTS = {
     "MORNING": {"label": "8 AM – 12 PM", "start": 8, "end": 12},
     "AFTERNOON": {"label": "12 PM – 4 PM", "start": 12, "end": 16},
@@ -22,16 +21,11 @@ RESCHEDULE_PHONE = "9230755876"
 
 
 def _normalize_phone(phone: str) -> str:
-    digits = re.sub(r"\D", "", phone or "")
-    if len(digits) > 10:
-        digits = digits[-10:]
-    return digits
+    return _norm_phone(phone)
 
 
 def _phone_clause() -> str:
-    return """
-    REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '+91', ''), '+', '') LIKE %s
-    """
+    return f"{mssql_phone10('phone')} = %s"
 
 
 def _ensure_slot_table() -> None:
@@ -118,27 +112,13 @@ def _record_slot_booking(
 
 
 def _valid_prebook_date(d: date) -> bool:
-    return d.day in PREBOOK_DAYS and d >= date.today()
+    return date.today() <= d <= date.today() + timedelta(days=6 * 31)
 
 
 def _upcoming_prebook_dates(months_ahead: int = 3) -> list[date]:
     today = date.today()
     end = today + timedelta(days=months_ahead * 31)
-    out: list[date] = []
-    cursor = date(today.year, today.month, 1)
-    while cursor <= end:
-        for day in PREBOOK_DAYS:
-            try:
-                candidate = date(cursor.year, cursor.month, day)
-            except ValueError:
-                continue
-            if candidate >= today:
-                out.append(candidate)
-        if cursor.month == 12:
-            cursor = date(cursor.year + 1, 1, 1)
-        else:
-            cursor = date(cursor.year, cursor.month + 1, 1)
-    return sorted(out)
+    return [today + timedelta(days=offset) for offset in range((end - today).days + 1)]
 
 
 def get_customer_profile(*, phone: str | None = None, email: str | None = None) -> dict[str, Any]:
@@ -156,7 +136,7 @@ def get_customer_profile(*, phone: str | None = None, email: str | None = None) 
                 WHERE {_phone_clause()}
                 ORDER BY regt_key DESC
                 """,
-                (f"%{phone_norm}",),
+                (phone_norm,),
             )
         else:
             cur.execute(
@@ -214,10 +194,10 @@ def list_customer_bills(*, phone: str, limit: int = 50) -> list[dict[str, Any]]:
                     WHERE d.bill_key = b.bill_key AND CONVERT(varchar(4), d.confirm_report) = '1') AS ready_count
             FROM BILL_HEAD b
             LEFT JOIN APNT_HEAD a ON a.bill_key = b.bill_key
-            WHERE REPLACE(REPLACE(REPLACE(REPLACE(b.phone, ' ', ''), '-', ''), '+91', ''), '+', '') LIKE %s
+            WHERE {mssql_phone10('b.phone')} = %s
             ORDER BY b.billdate DESC, b.bill_key DESC
             """,
-            (f"%{phone_norm}",),
+            (phone_norm,),
         )
     for row in rows:
         row["billdate"] = row["billdate"].isoformat() if row.get("billdate") else None
@@ -252,7 +232,7 @@ def list_customer_reports(*, phone: str, limit: int = 50) -> list[dict[str, Any]
             WHERE {_phone_clause()} AND ISNULL(d.report_key, 0) > 0
             ORDER BY b.billdate DESC, d.reportingdate DESC
             """,
-            (f"%{phone_norm}",),
+            (phone_norm,),
         )
     for row in rows:
         row["billdate"] = row["billdate"].isoformat() if row.get("billdate") else None
@@ -298,7 +278,7 @@ def get_prebook_calendar(months_ahead: int = 3) -> dict[str, Any]:
             )
         slots.append({"date": d.isoformat(), "slots": day_slots})
     return {
-        "prebook_days": list(PREBOOK_DAYS),
+        "prebook_days": list(range(1, 32)),
         "advance_fraction": PREBOOK_ADVANCE_FRACTION,
         "advance_non_refundable": True,
         "reschedule_phone": RESCHEDULE_PHONE,
@@ -328,7 +308,7 @@ def create_customer_prebooking(
     if time_slot not in TIME_SLOTS:
         raise ValueError(f"time_slot must be one of {list(TIME_SLOTS)}")
     if not _valid_prebook_date(slot_date):
-        raise ValueError("Prebooking only on 10th, 20th, or 30th of the month")
+        raise ValueError("Choose a date within the next six months")
 
     remaining = SLOT_CAPACITY - _count_slot_bookings(slot_date, time_slot)
     if remaining <= 0:
@@ -433,7 +413,7 @@ def record_pending_payment(
             FROM BILL_HEAD
             WHERE bill_key = %s AND {_phone_clause()}
             """,
-            (bill_key, f"%{phone_norm}"),
+            (bill_key, phone_norm),
         )
         row = cur.fetchone()
         if not row:

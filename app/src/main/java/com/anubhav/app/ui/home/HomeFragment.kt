@@ -16,6 +16,7 @@ import com.anubhav.app.R
 import com.anubhav.app.data.repository.CatalogRepository
 import com.anubhav.app.databinding.FragmentHomeBinding
 import com.anubhav.app.ui.metrics.TestDetailFragment
+import com.anubhav.app.utils.CustomerSessionManager
 import com.anubhav.app.utils.localized
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
@@ -103,7 +104,13 @@ class HomeFragment : Fragment() {
             findNavController().navigate(R.id.nav_my_bookings)
         }
         binding.root.findViewById<MaterialButton>(R.id.btnHomeCollection)?.setOnClickListener {
-            Toast.makeText(requireContext(), localized(R.string.home_collection_info), Toast.LENGTH_LONG).show()
+            val ctx = requireContext()
+            val message = ctx.localized(
+                R.string.home_collection_whatsapp_message,
+                CustomerSessionManager.getName(ctx).orEmpty(),
+                CustomerSessionManager.getPhone(ctx).orEmpty(),
+            )
+            launchOrToast(Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/919230755876?text=${Uri.encode(message)}")))
         }
         // "View All" carried a ripple and a touch target but no listener, so it read
         // as a button and did nothing.

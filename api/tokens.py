@@ -28,6 +28,10 @@ PATIENT_TTL = 180 * 24 * 3600
 STAFF_TTL = 12 * 3600
 
 
+class TokenConfigurationError(RuntimeError):
+    pass
+
+
 def _b64(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
 
@@ -43,8 +47,8 @@ def _sign(body: str, secret: str) -> str:
 def issue(kind: str, ttl: int, now: float | None = None, **claims: Any) -> str:
     secret = token_secret()
     if not secret:
-        raise RuntimeError("AKTIV_TOKEN_SECRET / AKTIV_API_KEY not configured")
-    payload = {"k": kind, "exp": int((now or time.time()) + ttl), **claims}
+        raise TokenConfigurationError("A separate AKTIV_TOKEN_SECRET must be configured on the server")
+    payload = {"k": kind, "exp": int((time.time() if now is None else now) + ttl), **claims}
     body = _b64(json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8"))
     return f"{body}.{_sign(body, secret)}"
 
@@ -63,7 +67,8 @@ def read(token: str | None, kind: str, now: float | None = None) -> dict[str, An
         return None
     if not isinstance(payload, dict) or payload.get("k") != kind:
         return None
-    if int(payload.get("exp", 0)) < (now or time.time()):
+    expiry = payload.get("exp")
+    if type(expiry) is not int or expiry <= (time.time() if now is None else now):
         return None
     return payload
 
@@ -74,7 +79,8 @@ def patient_token(phone10: str) -> str:
 
 def patient_phones(token: str | None) -> set[str]:
     claims = read(token, "p")
-    return {claims["ph"]} if claims and claims.get("ph") else set()
+    phone = claims.get("ph") if claims else None
+    return {phone} if isinstance(phone, str) and len(phone) == 10 and phone.isascii() and phone.isdigit() else set()
 
 
 def staff_token(user_key: int) -> str:
@@ -83,4 +89,5 @@ def staff_token(user_key: int) -> str:
 
 def staff_user_key(token: str | None) -> int | None:
     claims = read(token, "s")
-    return int(claims["uk"]) if claims and claims.get("uk") else None
+    user_key = claims.get("uk") if claims else None
+    return user_key if type(user_key) is int and user_key > 0 else None

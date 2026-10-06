@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import unicodedata
 import urllib.parse
 from datetime import date, datetime
 from typing import Any, Optional
@@ -65,7 +66,9 @@ def _sim(a: str, b: str) -> float:
 
 
 def _tokens(s: str) -> list[str]:
-    return [t for t in re.sub(r"[^a-zA-Z]+", " ", s or "").lower().split() if t]
+    # Keep Unicode letters and combining marks (Bengali vowel signs included).
+    text = unicodedata.normalize("NFC", s or "").casefold()
+    return "".join(c if unicodedata.category(c)[0] in "LM" else " " for c in text).split()
 
 
 def name_score(inp: str, db: str) -> float:
@@ -91,7 +94,18 @@ def name_score(inp: str, db: str) -> float:
 
 # ---------------------------------------------------------------- helpers
 def _norm_phone(p: Optional[str]) -> str:
-    return re.sub(r"\D", "", p or "")[-10:]
+    return "".join(str(unicodedata.decimal(c)) for c in (p or "") if c.isdecimal())[-10:]
+
+
+def mssql_phone10(column: str) -> str:
+    """Normalize legacy phone formatting consistently for all live reads.
+
+    column is a fixed SQL identifier supplied by this module's callers, never input.
+    """
+    sql = f"ISNULL({column},'')"
+    for separator in (" ", "-", "+", "(", ")", ".", "/"):
+        sql = f"REPLACE({sql},'{separator}','')"
+    return f"RIGHT({sql},10)"
 
 
 _JUNK_PHONES = {
@@ -216,7 +230,7 @@ def _serial_variants(serial: str) -> list[str]:
 def _candidates_mssql(phone_n, phone_valid, serial, bdate, month_prefix) -> list[dict]:
     clauses, params = [], []
     if phone_valid:
-        clauses.append("RIGHT(REPLACE(REPLACE(REPLACE(ISNULL(PHONE,''),' ',''),'-',''),'+',''),10) = %s")
+        clauses.append(f"{mssql_phone10('PHONE')} = %s")
         params.append(phone_n)
     if bdate:
         clauses.append("CAST(BILLDATE AS date) = %s")
@@ -229,7 +243,7 @@ def _candidates_mssql(phone_n, phone_valid, serial, bdate, month_prefix) -> list
             params.append(f"{like_prefix}/{v}")
         clauses.append("(" + " OR ".join(ors) + ")")
     sql = (
-        "SELECT TOP 500 BILL_KEY AS bill_key, RTRIM(BILL_NO) AS bill_no, RTRIM(ISNULL(PHONE,'')) AS phone, "
+        "SELECT BILL_KEY AS bill_key, RTRIM(BILL_NO) AS bill_no, RTRIM(ISNULL(PHONE,'')) AS phone, "
         "RTRIM(ISNULL(PATIENTNAME,'')) AS patientname, CONVERT(varchar, BILLDATE, 103) AS billdate "
         f"FROM BILL_HEAD WHERE {' OR '.join(clauses)} ORDER BY BILL_KEY DESC"
     )
@@ -255,7 +269,7 @@ def _candidates_neon(phone_n, phone_valid, serial, bdate, month_prefix) -> list[
     sql = (
         "SELECT bill_key, rtrim(coalesce(bill_no,'')) AS bill_no, rtrim(coalesce(phone,'')) AS phone, "
         "rtrim(coalesce(patientname,'')) AS patientname, to_char(billdate,'DD/MM/YYYY') AS billdate "
-        f"FROM bill_head WHERE {' OR '.join(clauses)} ORDER BY bill_key DESC LIMIT 500"
+        f"FROM bill_head WHERE {' OR '.join(clauses)} ORDER BY bill_key DESC"
     )
     with neon_conn() as conn, conn.cursor() as cur:
         return fetch_all(cur, sql, tuple(params))
@@ -274,9 +288,13 @@ def verify_customer(
     phone_valid = bool(phone_n) and not _is_junk_phone(phone_n)
     serial = _bill_serial(bill_no)
     bdate = _parse_date(bill_date)
+    if bill_no.strip() and (not serial or not serial.isascii() or not serial.isdigit() or len(serial) > 12):
+        raise ValueError("Enter the bill number or its last digits as printed on the receipt")
+    if bill_date and not bdate:
+        raise ValueError("Enter a valid bill date")
     # The month the ALC serial belongs to: from the bill date, or from a full
     # "YYYY/MM/ALC/NNNN" number when the patient typed the whole thing.
-    month_prefix = (f"{bdate.year:04d}/{bdate.month:02d}" if bdate else None) or _bill_month(bill_no) or None
+    month_prefix = _bill_month(bill_no) or (f"{bdate.year:04d}/{bdate.month:02d}" if bdate else None)
 
     if not (phone_valid or bdate or serial):
         return {"matched": False, "reason": "insufficient_input", "patient_name": "", "phone": phone_n, "bills": []}
@@ -289,13 +307,23 @@ def verify_customer(
         rows = _candidates_neon(phone_n, phone_valid, serial, bdate, month_prefix)
         source = "mirror"
 
+    scored = [(r, _score_row(r, name, phone_n, phone_valid, serial, bdate, month_prefix)) for r in rows]
+    best = max((score for _, score in scored), default=0)
+    candidates = [r for r, score in scored if score >= 2 and score == best]
+    # Never overwrite the identity with each row. Monthly serials and common names
+    # can match several households. Only a unique, strongest phone scope can log in.
+    phones = {_norm_phone(r["phone"]) for r in candidates if not _is_junk_phone(r["phone"])}
+    if candidates and (len(phones) != 1 or any(_is_junk_phone(r["phone"]) for r in candidates)):
+        return {
+            "matched": False,
+            "reason": "ambiguous_match" if len(phones) > 1 else "missing_record_phone",
+            "patient_name": "", "phone": "", "bills": [], "source": source,
+        }
+    canonical_phone = next(iter(phones), "")
     matched, seen = [], set()
-    canonical_phone = phone_n
-    for r in rows:
-        if _score_row(r, name, phone_n, phone_valid, serial, bdate, month_prefix) >= 2 and r["bill_key"] not in seen:
+    for r in candidates:
+        if r["bill_key"] not in seen:
             seen.add(r["bill_key"])
-            if not _is_junk_phone(r["phone"]):
-                canonical_phone = _norm_phone(r["phone"]) or canonical_phone
             matched.append({
                 "bill_key": r["bill_key"],
                 "bill_no": r["bill_no"],
@@ -361,7 +389,7 @@ def _history_neon(ph: str) -> tuple[list[dict], list[dict]]:
 def _history_mssql(ph: str, since: Optional[date]) -> tuple[list[dict], list[dict]]:
     """Same shape as _history_neon, from the live database (tests aggregated here,
     since STRING_AGG needs a newer SQL Server than the clinic may run)."""
-    phone_sql = "RIGHT(REPLACE(REPLACE(REPLACE(ISNULL(h.PHONE,''),' ',''),'-',''),'+',''),10) = %s"
+    phone_sql = f"{mssql_phone10('h.PHONE')} = %s"
     date_sql = " AND h.BILLDATE >= %s" if since else ""
     params: tuple = (ph, since) if since else (ph,)
     with mssql_conn() as conn, conn.cursor() as cur:
@@ -450,9 +478,13 @@ def customer_history(phone: str) -> dict[str, Any]:
     )
     visits = []
     for b in ordered:
+        report_set = sorted(
+            {(it["category_key"], it["report_key"]) for it in items.get(b["bill_key"], [])},
+            key=lambda item: (item[0] or 0, item[1]),
+        )
         ready_items = [
-            _view_item(b["patient_name"], b["bill_key"], it["category_key"], it["report_key"], b["bill_no"])
-            for it in items.get(b["bill_key"], [])
+            _view_item(b["patient_name"], b["bill_key"], category_key, report_key, b["bill_no"])
+            for category_key, report_key in report_set
         ]
         d = _as_date(b["raw_date"])
         visits.append({

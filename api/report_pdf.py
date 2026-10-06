@@ -2,9 +2,8 @@
 
 The AKTIV print page (LabReportPrint.aspx) sometimes returns an HTML error page or
 chokes on a particular report type, so its own multi-report collation can yield an
-invalid/undisplayable PDF. Here we fetch each confirmed report INDIVIDUALLY, keep
-only responses that are real PDFs, and merge the good ones with pypdf — a single
-bad report no longer breaks the whole file.
+invalid/undisplayable PDF. Fetch each confirmed report individually and validate
+every one before returning a complete PDF. Never silently cache a partial bill.
 """
 from __future__ import annotations
 
@@ -14,6 +13,10 @@ import urllib.request
 from config import report_fetch_base
 from db import fetch_all, mssql_conn
 from patient_match import _norm_phone, build_view_link
+
+
+class ReportUnavailable(RuntimeError):
+    """Temporary renderer failure; the patient can retry without losing any reports."""
 
 
 def _fetch_pdf(url: str, timeout: float = 60.0) -> bytes | None:
@@ -48,7 +51,7 @@ def collated_report_pdf(*, bill_key: int, phone: str | None = None) -> bytes:
             cur,
             "SELECT DISTINCT category_key, report_key FROM BILL_TEST_DTLS "
             "WHERE bill_key = %s AND ISNULL(report_key,0) > 0 "
-            "AND CONVERT(varchar(4), confirm_report) = '1'",
+            "AND CONVERT(varchar(4), confirm_report) = '1' ORDER BY category_key, report_key",
             (bill_key,),
         )
     if not items:
@@ -57,7 +60,6 @@ def collated_report_pdf(*, bill_key: int, phone: str | None = None) -> bytes:
     from pypdf import PdfReader, PdfWriter
 
     writer = PdfWriter()
-    merged = 0
     for it in items:
         url = build_view_link(
             h["patientname"], bill_key, it["category_key"], it["report_key"], h["bill_no"],
@@ -65,16 +67,15 @@ def collated_report_pdf(*, bill_key: int, phone: str | None = None) -> bytes:
         )
         data = _fetch_pdf(url)
         if not data:
-            continue
+            raise ReportUnavailable("A report could not be rendered. Please try again later.")
         try:
             reader = PdfReader(io.BytesIO(data))
+            if not reader.pages:
+                raise ValueError("empty report")
             for page in reader.pages:
                 writer.add_page(page)
-            merged += 1
-        except Exception:
-            continue  # corrupt/partial PDF for this report — skip, keep the rest
-    if merged == 0:
-        raise ValueError("reports could not be rendered right now")
+        except Exception as exc:
+            raise ReportUnavailable("A report could not be rendered. Please try again later.") from exc
 
     out = io.BytesIO()
     writer.write(out)

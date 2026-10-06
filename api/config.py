@@ -53,11 +53,10 @@ def api_key() -> str:
 
 
 def token_secret() -> str:
-    """HMAC secret signing patient/staff tokens (tokens.py). Falls back to the API key
-    so a server with only AKTIV_API_KEY set still issues verifiable tokens; set
-    AKTIV_TOKEN_SECRET separately so the secret never ships in the APK."""
+    """Server-only HMAC secret. The APK's shared API key cannot sign identities."""
     load_env()
-    return os.environ.get("AKTIV_TOKEN_SECRET", "").strip() or api_key()
+    secret = os.environ.get("AKTIV_TOKEN_SECRET", "").strip()
+    return secret if secret and secret != api_key() else ""
 
 
 def report_fetch_base() -> str:
