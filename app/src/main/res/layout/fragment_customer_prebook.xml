@@ -162,33 +162,57 @@
         </com.google.android.material.textfield.TextInputLayout>
 
         <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/layoutTestSearch"
             style="@style/Widget.Anubhav.TextInput"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="8dp"
-            android:hint="@string/search_tests">
+            android:hint="@string/booking_test_search_hint"
+            app:endIconMode="clear_text">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etTestSearch"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content" />
+                android:layout_height="wrap_content"
+                android:inputType="text"
+                android:imeOptions="actionSearch"
+                android:maxLines="1" />
         </com.google.android.material.textfield.TextInputLayout>
-
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/rvTests"
-            android:layout_width="match_parent"
-            android:layout_height="200dp"
-            android:background="@drawable/list_surface_bg"
-            android:layout_marginBottom="8dp" />
 
         <TextView
             android:id="@+id/tvSelectedTests"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="4dp"
-            android:textSize="14sp"
-            android:maxLines="2"
-            android:ellipsize="end" />
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/chipSelectedTests"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="6dp"
+            app:chipSpacingHorizontal="4dp"
+            app:chipSpacingVertical="2dp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/tvTestSearchStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvTests"
+            android:layout_width="match_parent"
+            android:layout_height="224dp"
+            android:background="@drawable/list_surface_bg"
+            android:layout_marginBottom="8dp"
+            android:visibility="gone" />
 
         <TextView
             android:id="@+id/tvTotalAmount"

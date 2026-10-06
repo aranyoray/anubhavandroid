@@ -188,12 +188,15 @@ def next_bill_number(bill_date: date | None = None) -> dict[str, str]:
 
 
 def search_tests(query: str = "", limit: int = 50) -> list[dict[str, Any]]:
-    pattern = f"%{query.strip()}%" if query.strip() else "%"
+    term = query.strip()
+    pattern = f"%{term}%" if term else "%"
+    exact = term or "__NO_QUERY__"
+    starts_with = f"{term}%" if term else "__NO_QUERY__"
     with neon_conn() as conn, conn.cursor() as cur:
         return fetch_all(
             cur,
             """
-            SELECT DISTINCT ON (mt.test_key)
+            SELECT
                 mt.test_key,
                 mt.testcode,
                 mt.testname,
@@ -211,10 +214,15 @@ def search_tests(query: str = "", limit: int = 50) -> list[dict[str, Any]]:
             LEFT JOIN mast_test_category mtc ON mtc.category_key = mt.category_key
             WHERE (mt.inactive IS NULL OR mt.inactive = 0)
               AND (mt.testname ILIKE %s OR mt.testcode ILIKE %s)
-            ORDER BY mt.test_key, mt.testname
+            ORDER BY CASE
+                WHEN mt.testcode ILIKE %s THEN 0
+                WHEN mt.testname ILIKE %s THEN 1
+                WHEN mt.testname ILIKE %s THEN 2
+                ELSE 3
+            END, LENGTH(mt.testname), mt.testname
             LIMIT %s
             """,
-            (pattern, pattern, limit),
+            (pattern, pattern, exact, exact, starts_with, limit),
         )
 
 

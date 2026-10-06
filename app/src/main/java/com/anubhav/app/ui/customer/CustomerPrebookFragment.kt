@@ -32,12 +32,16 @@ import com.anubhav.app.utils.LocationHelper
 import com.anubhav.app.utils.PaymentManager
 import com.anubhav.app.utils.localized
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.chip.Chip
+import com.google.android.material.chip.ChipGroup
 import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.razorpay.PaymentResultListener
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 class CustomerPrebookFragment : Fragment(), PaymentResultListener {
@@ -110,8 +114,11 @@ class CustomerPrebookFragment : Fragment(), PaymentResultListener {
         val btnUseLocation = view.findViewById<MaterialButton>(R.id.btnUseLocation)
         val btnPickOnMap = view.findViewById<MaterialButton>(R.id.btnPickOnMap)
         val etSearch = view.findViewById<TextInputEditText>(R.id.etTestSearch)
+        val searchLayout = view.findViewById<TextInputLayout>(R.id.layoutTestSearch)
         val rvTests = view.findViewById<RecyclerView>(R.id.rvTests)
         val tvSelected = view.findViewById<TextView>(R.id.tvSelectedTests)
+        val selectedChips = view.findViewById<ChipGroup>(R.id.chipSelectedTests)
+        val tvSearchStatus = view.findViewById<TextView>(R.id.tvTestSearchStatus)
         val tvTotal = view.findViewById<TextView>(R.id.tvTotalAmount)
         val tvAdvance = view.findViewById<TextView>(R.id.tvAdvanceAmount)
         val tvPolicy = view.findViewById<TextView>(R.id.tvPrebookPolicy)
@@ -119,6 +126,7 @@ class CustomerPrebookFragment : Fragment(), PaymentResultListener {
         val progress = view.findViewById<ProgressBar>(R.id.progressBar)
 
         view.findViewById<TextView>(R.id.tvPrebookTitle).text = localized(R.string.prebook_time_slot)
+        searchLayout.hint = localized(R.string.booking_test_search_hint)
         tvPolicy.text = localized(R.string.prebook_policy, getString(R.string.reschedule_phone))
         btnPay.text = localized(R.string.pay_advance)
         restoreState(savedInstanceState)
@@ -166,25 +174,22 @@ class CustomerPrebookFragment : Fragment(), PaymentResultListener {
                 selectedTests.remove(test.testKey)
             } else {
                 selectedTests[test.testKey] = test
+                etSearch.text?.clear()
             }
             testAdapter.submit(testAdapterItems, selectedTests.values.toList())
-            updateTotals(tvSelected, tvTotal, tvAdvance)
+            updateTotals(tvSelected, selectedChips, tvTotal, tvAdvance)
         }
         rvTests.layoutManager = LinearLayoutManager(requireContext())
         rvTests.adapter = testAdapter
-        updateTotals(tvSelected, tvTotal, tvAdvance)
+        updateTotals(tvSelected, selectedChips, tvTotal, tvAdvance)
         loadCalendar(progress, spinnerDate, spinnerSlot, tvPolicy)
-        searchTests("", progress)
+        searchTests("", tvSearchStatus, rvTests)
 
         etSearch.addTextChangedListener(
             object : TextWatcher {
                 override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
                 override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                    searchJob?.cancel()
-                    searchJob = viewLifecycleOwner.lifecycleScope.launch {
-                        delay(250)
-                        searchTests(s?.toString().orEmpty(), progress)
-                    }
+                    searchTests(s?.toString().orEmpty(), tvSearchStatus, rvTests)
                 }
 
                 override fun afterTextChanged(s: Editable?) = Unit
@@ -417,27 +422,64 @@ class CustomerPrebookFragment : Fragment(), PaymentResultListener {
         }
     }
 
-    private fun searchTests(query: String, progress: ProgressBar) {
-        viewLifecycleOwner.lifecycleScope.launch {
-            progress.visibility = View.VISIBLE
-            aktivRepo.searchTestsCached(requireContext(), query).fold(
-                onSuccess = {
-                    testAdapterItems = it
-                    testAdapter.submit(it, selectedTests.values.toList())
-                    progress.visibility = View.GONE
+    private fun searchTests(query: String, status: TextView, results: RecyclerView) {
+        searchJob?.cancel()
+        val text = query.trim()
+        testAdapterItems = emptyList()
+        testAdapter.submit(emptyList(), selectedTests.values.toList())
+        results.visibility = View.GONE
+        if (text.length < 2) {
+            status.text = localized(R.string.booking_test_search_prompt)
+            status.visibility = View.VISIBLE
+            return
+        }
+        status.text = localized(R.string.booking_test_searching)
+        status.visibility = View.VISIBLE
+        searchJob = viewLifecycleOwner.lifecycleScope.launch {
+            delay(220)
+            val found = aktivRepo.searchTestsCached(requireContext(), text)
+            if (!isActive) return@launch
+            found.fold(
+                onSuccess = { tests ->
+                    testAdapterItems = tests
+                    testAdapter.submit(tests, selectedTests.values.toList())
+                    results.visibility = if (tests.isEmpty()) View.GONE else View.VISIBLE
+                    status.text = localized(R.string.booking_test_search_empty)
+                    status.visibility = if (tests.isEmpty()) View.VISIBLE else View.GONE
                 },
                 onFailure = {
-                    progress.visibility = View.GONE
-                    Toast.makeText(requireContext(), localized(R.string.network_error), Toast.LENGTH_SHORT).show()
+                    status.text = localized(R.string.network_error)
+                    status.visibility = View.VISIBLE
                 },
             )
         }
     }
 
-    private fun updateTotals(tvSelected: TextView, tvTotal: TextView, tvAdvance: TextView) {
-        val names = selectedTests.values.joinToString(", ") { it.testName }
+    private fun updateTotals(
+        tvSelected: TextView,
+        selectedChips: ChipGroup,
+        tvTotal: TextView,
+        tvAdvance: TextView,
+    ) {
         val total = selectedTests.values.sumOf { it.rate }
-        tvSelected.text = names.ifBlank { localized(R.string.search_tests) }
+        val hasSelection = selectedTests.isNotEmpty()
+        tvSelected.visibility = if (hasSelection) View.VISIBLE else View.GONE
+        selectedChips.visibility = if (hasSelection) View.VISIBLE else View.GONE
+        tvSelected.text = localized(R.string.booking_selected_count, selectedTests.size)
+        selectedChips.removeAllViews()
+        selectedTests.values.forEach { test ->
+            selectedChips.addView(Chip(requireContext()).apply {
+                text = test.testName
+                isCheckable = false
+                isCloseIconVisible = true
+                closeIconContentDescription = localized(R.string.booking_remove_test, test.testName)
+                setOnCloseIconClickListener {
+                    selectedTests.remove(test.testKey)
+                    testAdapter.submit(testAdapterItems, selectedTests.values.toList())
+                    updateTotals(tvSelected, selectedChips, tvTotal, tvAdvance)
+                }
+            })
+        }
         tvTotal.text = localized(R.string.total_amount_value, total)
         tvAdvance.text = localized(R.string.advance_amount_value, total * 0.5)
     }
@@ -499,6 +541,7 @@ class CustomerPrebookFragment : Fragment(), PaymentResultListener {
                     testAdapter.submit(testAdapterItems, emptyList())
                     updateTotals(
                         root.findViewById(R.id.tvSelectedTests),
+                        root.findViewById(R.id.chipSelectedTests),
                         root.findViewById(R.id.tvTotalAmount),
                         root.findViewById(R.id.tvAdvanceAmount),
                     )

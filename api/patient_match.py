@@ -105,7 +105,9 @@ def _is_junk_phone(p: str) -> bool:
 
 
 def _bill_serial(bill_no: Optional[str]) -> str:
-    return (bill_no or "").split("/")[-1].strip().lstrip("0")
+    # Keep leading zeroes: 003 may be the last three digits of a four-digit
+    # serial such as 1003, while exact comparisons can still ignore padding.
+    return (bill_no or "").split("/")[-1].strip()
 
 
 def _bill_month(bill_no: Optional[str]) -> str:
@@ -129,7 +131,7 @@ def _serial_matches(row_serial: str, serial: str, phone_matched: bool) -> bool:
     """
     if not serial or not row_serial:
         return False
-    if row_serial == serial:
+    if row_serial == serial or row_serial.lstrip("0") == serial.lstrip("0"):
         return True
     return phone_matched and len(serial) >= 3 and serial.isdigit() and row_serial.endswith(serial)
 

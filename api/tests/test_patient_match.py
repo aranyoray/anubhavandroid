@@ -3,6 +3,7 @@ import types
 import unittest
 from datetime import date
 from pathlib import Path
+from unittest.mock import patch
 
 API_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(API_DIR))
@@ -36,8 +37,8 @@ class BillMonthTests(unittest.TestCase):
         self.assertEqual(pm._bill_month(""), "")
         self.assertEqual(pm._bill_month("ALC/3"), "")
 
-    def test_bill_serial_strips_prefix_and_padding(self):
-        self.assertEqual(pm._bill_serial("2024/01/ALC/003"), "3")
+    def test_bill_serial_strips_prefix_but_keeps_padding_for_suffix_match(self):
+        self.assertEqual(pm._bill_serial("2024/01/ALC/003"), "003")
         self.assertEqual(pm._bill_serial("2024/02/ALC/3"), "3")
 
 
@@ -78,6 +79,34 @@ class SerialMonthScopingTests(unittest.TestCase):
             serial="", bdate=date(2024, 1, 20), month_prefix="2024/01",
         )
         self.assertEqual(score, 2)  # name + exact bill date
+
+    def test_phone_and_last_three_digits_match_four_digit_serial(self):
+        row = _row("2026/09/ALC/4171", "20/09/2026", phone="9230755875")
+        self.assertEqual(pm._score_row(
+            row, name="", phone_n="9230755875", phone_valid=True,
+            serial="171", bdate=None, month_prefix=None,
+        ), 2)
+
+    def test_shortened_serial_without_phone_does_not_unlock_report(self):
+        row = _row("2026/09/ALC/4171", "20/09/2026")
+        self.assertEqual(pm._score_row(
+            row, name="PRITI DAS", phone_n="", phone_valid=False,
+            serial="171", bdate=None, month_prefix=None,
+        ), 1)
+
+    def test_phone_and_zero_prefixed_tail_match_four_digit_serial(self):
+        row = _row("2026/09/ALC/1003", "20/09/2026", phone="9230755875")
+        self.assertEqual(pm._score_row(
+            row, name="", phone_n="9230755875", phone_valid=True,
+            serial="003", bdate=None, month_prefix=None,
+        ), 2)
+
+    def test_verify_returns_report_for_phone_and_three_digit_tail(self):
+        row = {**_row("2026/09/ALC/1003", "20/09/2026", phone="9230755875"), "bill_key": 42}
+        with patch.object(pm, "_candidates_mssql", return_value=[row]):
+            result = pm.verify_customer("", "9230755875", "003")
+        self.assertTrue(result["matched"])
+        self.assertEqual(result["bills"][0]["bill_no"], "2026/09/ALC/1003")
 
 
 if __name__ == "__main__":

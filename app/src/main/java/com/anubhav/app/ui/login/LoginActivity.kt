@@ -4,8 +4,9 @@ import android.app.DatePickerDialog
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.text.Editable
 import android.text.InputType
-import android.view.Gravity
+import android.text.TextWatcher
 import android.view.View
 import android.widget.EditText
 import android.widget.ImageView
@@ -40,6 +41,7 @@ import com.google.android.gms.common.api.ApiException
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
 import com.google.firebase.auth.FacebookAuthProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
@@ -327,94 +329,91 @@ class LoginActivity : AppCompatActivity() {
      * More secure than phone-only (a phone number alone shouldn't unlock someone's reports).
      */
     private fun showClinicVerifyDialog(prefillPhone: String) {
-        val d = (resources.displayMetrics.density)
-        fun px(v: Int) = (v * d).toInt()
-        val container = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(px(20), px(8), px(20), 0)
-        }
-        val etName = EditText(this).apply {
-            hint = localized(R.string.verify_patient_name_hint)
-            inputType = InputType.TYPE_TEXT_FLAG_CAP_WORDS or InputType.TYPE_CLASS_TEXT
-        }
-        val etPhone = EditText(this).apply {
-            hint = localized(R.string.verify_phone_hint); inputType = InputType.TYPE_CLASS_PHONE; setText(prefillPhone)
-        }
-        val etBill = EditText(this).apply {
-            // Text, not number: patients copy "2026/09/ALC/4171" off the receipt as often as "4171".
-            hint = localized(R.string.verify_bill_no_hint); inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
+        val form = layoutInflater.inflate(R.layout.dialog_report_lookup, null)
+        form.findViewById<TextView>(R.id.tvLookupHelp).text = localized(R.string.verify_dialog_message_short)
+        form.findViewById<TextInputLayout>(R.id.layoutLookupName).hint = localized(R.string.verify_patient_name_hint)
+        form.findViewById<TextInputLayout>(R.id.layoutLookupPhone).hint = localized(R.string.verify_phone_hint)
+        form.findViewById<TextView>(R.id.tvLookupDateLabel).text = localized(R.string.verify_bill_date_label)
+        form.findViewById<TextView>(R.id.tvLookupBillLabel).text = localized(R.string.verify_bill_no_label)
+        form.findViewById<TextView>(R.id.tvLookupOr).text = localized(R.string.verify_or_short)
+        form.findViewById<TextView>(R.id.tvLookupBillHint).text = localized(R.string.verify_bill_digits_hint)
+        val etName = form.findViewById<TextInputEditText>(R.id.etLookupName)
+        val etPhone = form.findViewById<TextInputEditText>(R.id.etLookupPhone).apply { setText(prefillPhone) }
+        val etBill = form.findViewById<EditText>(R.id.etLookupBillDigits)
+        val dateBtn = form.findViewById<MaterialButton>(R.id.btnLookupDate).apply {
+            text = localized(R.string.verify_pick_date_short)
         }
         var billDateIso: String? = null
-        val dateBtn = com.google.android.material.button.MaterialButton(this).apply {
-            text = localized(R.string.verify_pick_bill_date)
-            setOnClickListener {
-                val c = Calendar.getInstance()
-                DatePickerDialog(this@LoginActivity, { _, y, m, day ->
-                    billDateIso = String.format(Locale.US, "%04d-%02d-%02d", y, m + 1, day)
-                    text = localized(
-                        R.string.verify_bill_date_value,
-                        String.format(Locale.US, "%02d/%02d/%04d", day, m + 1, y),
-                    )
-                }, c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH)).show()
-            }
+        dateBtn.setOnClickListener {
+            val c = Calendar.getInstance()
+            DatePickerDialog(this, { _, y, m, day ->
+                billDateIso = String.format(Locale.US, "%04d-%02d-%02d", y, m + 1, day)
+                dateBtn.text = String.format(Locale.US, "%02d/%02d/%04d", day, m + 1, y)
+                etBill.text?.clear()
+            }, c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH)).show()
         }
-        container.addView(etName)
-        container.addView(etPhone)
-        container.addView(TextView(this).apply { text = localized(R.string.verify_bill_no_label); setPadding(0, px(8), 0, 0) })
-        container.addView(etBill)
-        container.addView(TextView(this).apply { text = localized(R.string.verify_or_divider); gravity = Gravity.CENTER; setPadding(0, px(6), 0, px(6)) })
-        container.addView(dateBtn)
+        etBill.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                if (!s.isNullOrEmpty() && billDateIso != null) {
+                    billDateIso = null
+                    dateBtn.text = localized(R.string.verify_pick_date_short)
+                }
+            }
+            override fun afterTextChanged(s: Editable?) = Unit
+        })
 
         val dialog = AlertDialog.Builder(this)
             .setTitle(localized(R.string.verify_dialog_title_login))
-            .setMessage(localized(R.string.verify_dialog_message))
-            .setView(container)
+            .setView(form)
             .setPositiveButton(localized(R.string.verify_positive_view), null)
             .setNegativeButton(localized(R.string.cancel), null)
             .create()
-        dialog.setOnShowListener {
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val name = etName.text.toString().trim()
-                val phone = etPhone.text.toString().trim()
-                val bill = etBill.text.toString().trim()
-                val provided = listOf(name.isNotEmpty(), bill.isNotEmpty() || billDateIso != null, phone.isNotEmpty()).count { it }
-                if (provided < 2) {
-                    Toast.makeText(this, localized(R.string.verify_fill_two_fields), Toast.LENGTH_SHORT).show()
-                    return@setOnClickListener
-                }
-                setLoading(true)
-                lifecycleScope.launch {
-                    customerRepo.verify(name, phone, bill, billDateIso).fold(
-                        onSuccess = { r ->
-                            setLoading(false)
-                            if (r.matched && r.phone.isNotBlank()) {
-                                PatientTokens.save(r.phone, r.token)
-                                CustomerSessionManager.save(
-                                    this@LoginActivity,
-                                    phone = r.phone,
-                                    email = null,
-                                    name = r.patientName,
-                                    firebaseUid = "clinic-verify-${r.phone}",
-                                )
-                                dialog.dismiss()
-                                openMain()
-                            } else {
-                                Toast.makeText(
-                                    this@LoginActivity,
-                                    localized(R.string.verify_no_match),
-                                    Toast.LENGTH_LONG,
-                                ).show()
-                            }
-                        },
-                        onFailure = { err ->
-                            setLoading(false)
-                            Toast.makeText(this@LoginActivity, err.localizedMessage ?: localized(R.string.network_error), Toast.LENGTH_LONG).show()
-                        },
-                    )
-                }
+        dialog.show()
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            val name = etName.text?.toString()?.trim().orEmpty()
+            val phone = etPhone.text?.toString()?.trim().orEmpty()
+            val bill = etBill.text?.toString()?.trim().orEmpty()
+            if (bill.isNotEmpty() && bill.length < 3) {
+                etBill.error = localized(R.string.verify_bill_digits_required)
+                return@setOnClickListener
+            }
+            val provided = listOf(name.isNotEmpty(), bill.isNotEmpty() || billDateIso != null, phone.isNotEmpty()).count { it }
+            if (provided < 2) {
+                Toast.makeText(this, localized(R.string.verify_fill_two_fields), Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            val submit = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+            submit.isEnabled = false
+            setLoading(true)
+            lifecycleScope.launch {
+                customerRepo.verify(name, phone, bill, billDateIso).fold(
+                    onSuccess = { r ->
+                        setLoading(false)
+                        if (r.matched && r.phone.isNotBlank()) {
+                            PatientTokens.save(r.phone, r.token)
+                            CustomerSessionManager.save(
+                                this@LoginActivity,
+                                phone = r.phone,
+                                email = null,
+                                name = r.patientName,
+                                firebaseUid = "clinic-verify-${r.phone}",
+                            )
+                            dialog.dismiss()
+                            openMain()
+                        } else {
+                            submit.isEnabled = true
+                            Toast.makeText(this@LoginActivity, localized(R.string.verify_no_match), Toast.LENGTH_LONG).show()
+                        }
+                    },
+                    onFailure = { err ->
+                        setLoading(false)
+                        submit.isEnabled = true
+                        Toast.makeText(this@LoginActivity, err.localizedMessage ?: localized(R.string.network_error), Toast.LENGTH_LONG).show()
+                    },
+                )
             }
         }
-        dialog.show()
     }
 
     private fun handleEmailAuth() {
