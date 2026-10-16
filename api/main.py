@@ -41,7 +41,7 @@ from collector_portal import (
 )
 from patient_match import _norm_phone, customer_history, verify_customer
 from report_pdf import ReportUnavailable, collated_report_pdf
-from report_values import report_values
+from report_values import report_values, report_values_debug
 from staff_portal import bill_detail, edit_bill, search_bills
 import analytics
 import roles
@@ -430,6 +430,17 @@ def api_customer_report_values(bill_key: int, phone: str, x_patient_token: str =
         raise HTTPException(status_code=403, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        raise internal_error(exc) from exc
+
+
+@app.get("/api/staff/report-values-debug/{bill_key}")
+def api_report_values_debug(bill_key: int, x_staff_token: str = STAFF_TOKEN):
+    """Which *_DTLS tables/columns the value extractor matches for a bill, with row
+    counts — for verifying coverage. Staff-only and returns no patient values."""
+    require_staff(x_staff_token)
+    try:
+        return report_values_debug(bill_key=bill_key)
     except Exception as exc:
         raise internal_error(exc) from exc
 

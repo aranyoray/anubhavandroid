@@ -201,6 +201,50 @@ def report_values(*, bill_key: int, phone: str | None = None) -> dict[str, Any]:
     return _envelope(h, reports)
 
 
+def report_values_debug(*, bill_key: int) -> dict[str, Any]:
+    """Coverage diagnostic: per department table, whether it exists, the columns the
+    extractor chose, and how many rows this bill has. Returns NO patient values."""
+    tables: list[dict[str, Any]] = []
+    with mssql_conn() as conn, conn.cursor() as cur:
+        for table, strategy, head_table in DEPT_TABLES:
+            cols = _columns(cur, table)
+            entry: dict[str, Any] = {"table": table, "exists": bool(cols), "strategy": strategy}
+            if not cols:
+                tables.append(entry)
+                continue
+            chosen = {
+                "parameter": _pick(cols, PARAM_COLS),
+                "result": _pick(cols, RESULT_COLS),
+                "unit": _pick(cols, UNIT_COLS),
+                "range": _pick(cols, RANGE_COLS),
+                "low": _pick(cols, LOW_COLS),
+                "high": _pick(cols, HIGH_COLS),
+                "report_key": cols.get("REPORT_KEY"),
+                "test_key": cols.get("TEST_KEY"),
+                "bill_key": cols.get("BILL_KEY"),
+            }
+            entry["columns"] = chosen
+            try:
+                if strategy == "bill_key" and "BILL_KEY" in cols:
+                    r = fetch_all(cur, f"SELECT COUNT_BIG(*) AS n FROM {table} d WHERE d.[{cols['BILL_KEY']}] = %s", (bill_key,))
+                elif strategy == "report_key" and chosen["report_key"] and head_table:
+                    r = fetch_all(
+                        cur,
+                        f"SELECT COUNT_BIG(*) AS n FROM {table} d "
+                        f"INNER JOIN {head_table} h ON h.REPORT_KEY = d.[{chosen['report_key']}] WHERE h.BILL_KEY = %s",
+                        (bill_key,),
+                    )
+                elif "BILL_KEY" in cols:
+                    r = fetch_all(cur, f"SELECT COUNT_BIG(*) AS n FROM {table} d WHERE d.[{cols['BILL_KEY']}] = %s", (bill_key,))
+                else:
+                    r = [{"n": None}]
+                entry["row_count"] = r[0]["n"] if r else 0
+            except Exception as exc:  # noqa: BLE001 — surface the DB message for debugging
+                entry["error"] = str(exc)[:200]
+            tables.append(entry)
+    return {"bill_key": bill_key, "tables": tables}
+
+
 def _envelope(h: dict, reports: list[dict]) -> dict[str, Any]:
     abnormal = sum(1 for r in reports for p in r["parameters"] if p["flag"] in ("LOW", "HIGH"))
     return {
