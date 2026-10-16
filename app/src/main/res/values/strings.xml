@@ -183,6 +183,15 @@
     <string name="report_saved_to_downloads">Saved to your Downloads folder</string>
     <string name="report_save_failed">Could not save the PDF</string>
     <string name="report_share_failed">No app available to share the PDF</string>
+    <string name="report_values_title">Report values</string>
+    <string name="report_export_pdf">Export PDF</string>
+    <string name="report_values_empty">Values aren\'t available for this report yet.</string>
+    <string name="report_values_abnormal">%1$s value(s) outside the normal range</string>
+    <string name="report_values_all_normal">All values within range</string>
+    <string name="report_values_ref">Ref: %1$s</string>
+    <string name="report_values_view_trend">View trend</string>
+    <string name="report_values_trend_loading">Loading earlier results…</string>
+    <string name="report_values_trend_none">No earlier readings to chart yet</string>
     <string name="error">Error</string>
     <string name="success">Success</string>
     <string name="retry">Retry</string>
@@ -779,4 +788,13 @@ Net ₹%3$s · Received ₹%4$s</string>
     <string name="report_saved_to_downloads_bn">আপনার ডাউনলোড ফোল্ডারে সেভ হয়েছে</string>
     <string name="report_save_failed_bn">পিডিএফ সেভ করা গেল না</string>
     <string name="report_share_failed_bn">পিডিএফ শেয়ার করার কোনো অ্যাপ নেই</string>
+    <string name="report_values_title_bn">রিপোর্টের মান</string>
+    <string name="report_export_pdf_bn">পিডিএফ এক্সপোর্ট করুন</string>
+    <string name="report_values_empty_bn">এই রিপোর্টের মান এখনও পাওয়া যায়নি।</string>
+    <string name="report_values_abnormal_bn">%1$s টি মান স্বাভাবিক সীমার বাইরে</string>
+    <string name="report_values_all_normal_bn">সব মান সীমার মধ্যে</string>
+    <string name="report_values_ref_bn">সীমা: %1$s</string>
+    <string name="report_values_view_trend_bn">ট্রেন্ড দেখুন</string>
+    <string name="report_values_trend_loading_bn">আগের ফলাফল আনা হচ্ছে…</string>
+    <string name="report_values_trend_none_bn">চার্ট করার মতো আগের ফলাফল নেই</string>
 </resources>

@@ -112,6 +112,12 @@ class CustomerRepository(
     suspend fun getReports(phone: String): Result<List<CustomerReport>> =
         apiResult { api.getReports(phone) }
 
+    suspend fun getReportValues(
+        billKey: Int,
+        phone: String,
+    ): Result<com.anubhav.app.data.model.ReportValuesResponse> =
+        apiResult { api.getReportValues(billKey, phone) }
+
     suspend fun getReportsCached(
         context: Context,
         phone: String,

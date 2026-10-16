@@ -36,6 +36,34 @@ data class CustomerVerifyResponse(
 )
 
 /** One AKTIV visit (bill) from the static all-history DB — the My Reports row. */
+/** Structured per-parameter results for a bill (from /api/customer/report-values). */
+data class ReportValuesResponse(
+    @SerializedName("bill_key") val billKey: Int,
+    @SerializedName("bill_no") val billNo: String? = null,
+    @SerializedName("patient_name") val patientName: String? = null,
+    @SerializedName("bill_date") val billDate: String? = null,
+    @SerializedName("abnormal_count") val abnormalCount: Int = 0,
+    val reports: List<ReportGroup> = emptyList(),
+)
+
+data class ReportGroup(
+    val category: String? = null,
+    @SerializedName("report_key") val reportKey: Int? = null,
+    @SerializedName("test_name") val testName: String? = null,
+    val parameters: List<ReportParam> = emptyList(),
+)
+
+data class ReportParam(
+    val name: String = "",
+    val result: String? = null,
+    val unit: String? = null,
+    val range: String? = null,
+    val low: Double? = null,
+    val high: Double? = null,
+    val value: Double? = null,
+    val flag: String? = null, // NORMAL / LOW / HIGH
+)
+
 data class CustomerVisit(
     @SerializedName("bill_key") val billKey: Int,
     @SerializedName("patient_name") val patientName: String? = null,

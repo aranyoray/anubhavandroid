@@ -39,6 +39,12 @@ interface CustomerApi {
         @Query("limit") limit: Int = 50,
     ): List<CustomerBill>
 
+    @GET("api/customer/report-values")
+    suspend fun getReportValues(
+        @Query("bill_key") billKey: Int,
+        @Query("phone") phone: String,
+    ): com.anubhav.app.data.model.ReportValuesResponse
+
     @GET("api/customer/reports")
     suspend fun getReports(
         @Query("phone") phone: String,
