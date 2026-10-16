@@ -130,6 +130,22 @@ object ReportFetcher {
         }.isSuccess
     }
 
+    /** Open the full Android share sheet (WhatsApp recents, Instagram, Messenger, …). */
+    fun shareChooser(context: Context, file: File, message: String): Boolean {
+        val uri = runCatching { uriFor(context, file) }.getOrNull() ?: return false
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = "application/pdf"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_TEXT, message)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        return runCatching {
+            context.startActivity(
+                Intent.createChooser(send, "Share report").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        }.isSuccess
+    }
+
     /** Copy the report PDF into the public Downloads folder so it persists outside the app. */
     fun saveToDownloads(context: Context, file: File, displayName: String): Boolean = runCatching {
         val name = if (displayName.endsWith(".pdf", true)) displayName else "$displayName.pdf"

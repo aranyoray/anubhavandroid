@@ -158,14 +158,20 @@ class MyReportsFragment : Fragment() {
         }
         botRow.addView(info)
 
+        // Values expand/collapse inline under the card — no separate page.
+        val valuesBox = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL; visibility = View.GONE
+            setPadding(0, dp(8), 0, 0)
+        }
         val viewBtn = Button(requireContext()).apply {
             text = localized(R.string.reports_view_report); isAllCaps = false
-            setOnClickListener { onViewReport(v, this) }
             isEnabled = v.hasViewLink
             alpha = if (v.hasViewLink) 1f else 0.5f
         }
+        viewBtn.setOnClickListener { toggleValues(v, viewBtn, valuesBox) }
         botRow.addView(viewBtn)
         card.addView(botRow)
+        card.addView(valuesBox)
         if (!v.hasViewLink) {
             card.addView(TextView(requireContext()).apply {
                 text = localized(R.string.reports_awaiting_authorisation)
@@ -175,22 +181,181 @@ class MyReportsFragment : Fragment() {
         return card
     }
 
-    private fun onViewReport(v: CustomerVisit, @Suppress("UNUSED_PARAMETER") btn: Button) {
-        val link = v.viewLink
-        if (link.isNullOrBlank()) {
+    private fun toggleValues(v: CustomerVisit, btn: Button, box: LinearLayout) {
+        if (!v.hasViewLink) {
             Toast.makeText(requireContext(), localized(R.string.reports_not_ready_toast), Toast.LENGTH_SHORT).show()
             return
         }
-        // Open the values visualizer (accordions + trends); the PDF is an export option there.
-        startActivity(
-            android.content.Intent(requireContext(), ReportValuesActivity::class.java).apply {
-                putExtra(ReportValuesActivity.EXTRA_BILL_KEY, v.billKey)
-                putExtra(ReportValuesActivity.EXTRA_PHONE, shownPhone)
-                putExtra(ReportValuesActivity.EXTRA_BILL_NO, v.billNo)
-                putExtra(ReportValuesActivity.EXTRA_TESTS, v.tests)
-                putExtra(ReportValuesActivity.EXTRA_VIEW_LINK, link)
-            },
-        )
+        if (box.visibility == View.VISIBLE) {
+            box.visibility = View.GONE
+            btn.text = localized(R.string.reports_view_report)
+            return
+        }
+        box.visibility = View.VISIBLE
+        btn.text = localized(R.string.reports_hide_report)
+        if (box.tag == "loaded") return
+
+        box.removeAllViews()
+        box.addView(TextView(requireContext()).apply {
+            text = localized(R.string.loading); setTextColor(0xFF667085.toInt()); textSize = 13f
+        })
+        viewLifecycleOwner.lifecycleScope.launch {
+            repo.getReportValues(v.billKey, shownPhone)
+                .onSuccess { data -> box.tag = "loaded"; renderValues(box, data, v) }
+                .onFailure { err ->
+                    box.removeAllViews()
+                    box.addView(TextView(requireContext()).apply {
+                        text = localized(R.string.report_values_unavailable)
+                        setTextColor(0xFF667085.toInt()); textSize = 13f
+                    })
+                    box.addView(openPdfButton(v))
+                    if (CustomerRepository.needsVerification(err)) {
+                        PatientTokens.forget(shownPhone); showVerifyPrompt(shownPhone)
+                    }
+                }
+        }
+    }
+
+    private fun renderValues(box: LinearLayout, data: com.anubhav.app.data.model.ReportValuesResponse, v: CustomerVisit) {
+        box.removeAllViews()
+        box.addView(TextView(requireContext()).apply {
+            text = if (data.abnormalCount > 0) localized(R.string.report_values_abnormal, data.abnormalCount.toString())
+            else localized(R.string.report_values_all_normal)
+            setTextColor(if (data.abnormalCount > 0) 0xFFC2410C.toInt() else 0xFF2E7D32.toInt())
+            textSize = 13f; setTypeface(typeface, Typeface.BOLD); setPadding(0, 0, 0, dp(6))
+        })
+        if (data.reports.isEmpty()) {
+            box.addView(TextView(requireContext()).apply {
+                text = localized(R.string.report_values_empty); setTextColor(0xFF667085.toInt()); textSize = 13f
+            })
+        }
+        data.reports.forEachIndexed { i, g -> box.addView(groupAccordion(g, i == 0)) }
+        box.addView(openPdfButton(v))
+    }
+
+    private fun groupAccordion(group: com.anubhav.app.data.model.ReportGroup, expanded: Boolean): View {
+        val wrap = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(0xFFF4F7F8.toInt())
+            setPadding(dp(10), dp(8), dp(10), dp(8))
+            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(6) }
+        }
+        val body = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL; visibility = if (expanded) View.VISIBLE else View.GONE
+        }
+        val chevron = TextView(requireContext()).apply {
+            text = if (expanded) "–" else "+"; textSize = 18f; setTextColor(0xFF0B6FB4.toInt())
+        }
+        val header = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+            addView(TextView(requireContext()).apply {
+                text = group.testName?.takeIf { it.isNotBlank() } ?: group.category.orEmpty()
+                textSize = 14f; setTypeface(typeface, Typeface.BOLD); setTextColor(0xFF1D2939.toInt())
+                layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
+            })
+            addView(chevron)
+            setOnClickListener {
+                val show = body.visibility != View.VISIBLE
+                body.visibility = if (show) View.VISIBLE else View.GONE
+                chevron.text = if (show) "–" else "+"
+            }
+        }
+        wrap.addView(header)
+        group.parameters.forEach { body.addView(paramRow(it)) }
+        wrap.addView(body)
+        return wrap
+    }
+
+    private fun paramRow(p: com.anubhav.app.data.model.ReportParam): View {
+        val row = LinearLayout(requireContext()).apply { orientation = LinearLayout.VERTICAL; setPadding(0, dp(8), 0, dp(8)) }
+        val top = LinearLayout(requireContext()).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        top.addView(TextView(requireContext()).apply {
+            text = p.name; textSize = 14f; setTextColor(0xFF1D2939.toInt())
+            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
+        })
+        val flagColor = when (p.flag?.uppercase()) {
+            "HIGH" -> 0xFFC2410C.toInt(); "LOW" -> 0xFF0B6FB4.toInt(); else -> 0xFF2E7D32.toInt()
+        }
+        top.addView(TextView(requireContext()).apply {
+            text = listOfNotNull(p.result?.takeIf { it.isNotBlank() }, p.unit?.takeIf { it.isNotBlank() }).joinToString(" ")
+            textSize = 15f; setTypeface(typeface, Typeface.BOLD); setTextColor(flagColor)
+        })
+        row.addView(top)
+        p.range?.takeIf { it.isNotBlank() }?.let {
+            row.addView(TextView(requireContext()).apply {
+                text = localized(R.string.report_values_ref, it); textSize = 12f
+                setTextColor(0xFF667085.toInt()); setPadding(0, dp(2), 0, 0)
+            })
+        }
+        if (p.value != null) {
+            row.addView(TextView(requireContext()).apply {
+                text = localized(R.string.report_values_view_trend); textSize = 13f
+                setTextColor(0xFF0B6FB4.toInt()); setPadding(0, dp(4), 0, 0)
+                setOnClickListener { showTrend(p.name, p.low?.toFloat(), p.high?.toFloat()) }
+            })
+        }
+        return row
+    }
+
+    private fun showTrend(paramName: String, low: Float?, high: Float?) {
+        Toast.makeText(requireContext(), localized(R.string.report_values_trend_loading), Toast.LENGTH_SHORT).show()
+        viewLifecycleOwner.lifecycleScope.launch {
+            val visits = repo.getHistory(shownPhone).getOrNull()?.visits
+                ?.filter { it.hasViewLink }?.sortedByDescending { it.billDate }?.take(6).orEmpty()
+            val points = mutableListOf<TrendChartView.Point>()
+            for (vi in visits) {
+                val data = repo.getReportValues(vi.billKey, shownPhone).getOrNull() ?: continue
+                val m = data.reports.flatMap { it.parameters }
+                    .firstOrNull { it.name.equals(paramName, ignoreCase = true) && it.value != null } ?: continue
+                points.add(TrendChartView.Point((data.billDate ?: vi.billDate).orEmpty().take(5), m.value!!.toFloat()))
+            }
+            points.reverse()
+            if (points.size < 2) {
+                Toast.makeText(requireContext(), localized(R.string.report_values_trend_none), Toast.LENGTH_LONG).show()
+                return@launch
+            }
+            val chart = TrendChartView(requireContext()).apply {
+                layoutParams = LinearLayout.LayoutParams(MATCH, WRAP); setData(points, low, high)
+            }
+            val wrap = LinearLayout(requireContext()).apply {
+                orientation = LinearLayout.VERTICAL; setPadding(dp(18), dp(16), dp(18), dp(18))
+                addView(TextView(requireContext()).apply {
+                    text = paramName; textSize = 16f; setTypeface(typeface, Typeface.BOLD); setPadding(0, 0, 0, dp(8))
+                })
+                addView(chart)
+            }
+            com.google.android.material.bottomsheet.BottomSheetDialog(requireContext()).apply { setContentView(wrap) }.show()
+        }
+    }
+
+    private fun openPdfButton(v: CustomerVisit) = Button(requireContext()).apply {
+        text = localized(R.string.reports_open_pdf); isAllCaps = false
+        layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(8) }
+        setOnClickListener { openPdf(v, this) }
+    }
+
+    private fun openPdf(v: CustomerVisit, btn: Button) {
+        val link = v.viewLink ?: return
+        btn.isEnabled = false
+        val original = btn.text
+        btn.text = localized(R.string.reports_fetching)
+        viewLifecycleOwner.lifecycleScope.launch {
+            apiResult { ReportFetcher.download(requireContext(), v.billKey, shownPhone, link) }
+                .onSuccess { file ->
+                    btn.isEnabled = true; btn.text = original
+                    val name = "Anubhav-Report-${(v.billNo ?: v.billKey.toString()).filter { it.isLetterOrDigit() }}"
+                    val msg = "Anubhav Life Care report ${v.billNo.orEmpty()} ${v.tests.orEmpty()}".trim()
+                    ReportPdfDialog.show(parentFragmentManager, file.absolutePath, name, msg)
+                }
+                .onFailure { err ->
+                    btn.isEnabled = true; btn.text = original
+                    if (err is ReportFetcher.NotAllowed) {
+                        PatientTokens.forget(shownPhone); showVerifyPrompt(shownPhone)
+                    } else {
+                        Toast.makeText(requireContext(), localized(R.string.reports_fetch_failed), Toast.LENGTH_LONG).show()
+                    }
+                }
+        }
     }
 
     /** With no verified phone yet (guest, Google/email sign-in) the lookup finds their OWN reports. */

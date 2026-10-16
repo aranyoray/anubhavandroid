@@ -192,6 +192,10 @@
     <string name="report_values_view_trend">View trend</string>
     <string name="report_values_trend_loading">Loading earlier results…</string>
     <string name="report_values_trend_none">No earlier readings to chart yet</string>
+    <string name="reports_hide_report">Hide values</string>
+    <string name="reports_open_pdf">Open report PDF</string>
+    <string name="report_values_unavailable">Detailed values aren\'t available — open the PDF instead.</string>
+    <string name="report_share_sheet">Share via WhatsApp, Instagram…</string>
     <string name="error">Error</string>
     <string name="success">Success</string>
     <string name="retry">Retry</string>
@@ -797,4 +801,8 @@ Net ₹%3$s · Received ₹%4$s</string>
     <string name="report_values_view_trend_bn">ট্রেন্ড দেখুন</string>
     <string name="report_values_trend_loading_bn">আগের ফলাফল আনা হচ্ছে…</string>
     <string name="report_values_trend_none_bn">চার্ট করার মতো আগের ফলাফল নেই</string>
+    <string name="reports_hide_report_bn">মান লুকান</string>
+    <string name="reports_open_pdf_bn">রিপোর্ট পিডিএফ খুলুন</string>
+    <string name="report_values_unavailable_bn">বিস্তারিত মান পাওয়া যায়নি — পিডিএফ খুলুন।</string>
+    <string name="report_share_sheet_bn">হোয়াটসঅ্যাপ, ইনস্টাগ্রামে শেয়ার করুন…</string>
 </resources>

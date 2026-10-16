@@ -72,11 +72,6 @@
             </intent-filter>
         </activity>
         <activity
-            android:name=".ui.customer.ReportValuesActivity"
-            android:exported="false"
-            android:theme="@style/Theme.AnubhavLifeCare.NoActionBar" />
-
-        <activity
             android:name=".MainActivity"
             android:exported="true"
             android:theme="@style/Theme.AnubhavLifeCare.Splash"
