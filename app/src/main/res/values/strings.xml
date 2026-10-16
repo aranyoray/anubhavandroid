@@ -105,7 +105,7 @@
     <string name="prebook_doctor">Prebook Doctor</string>
     <string name="total_amount">Total Amount</string>
     <string name="advance_payment">Advance Payment</string>
-    <string name="pay_advance">Pay 50%% Advance</string>
+    <string name="pay_advance" formatted="false">Pay 50% Advance</string>
     <string name="book_now">Book Now</string>
     <string name="patient_age">Age (years)</string>
     <string name="patient_sex">Sex</string>
@@ -293,7 +293,7 @@
 <string name="bill_register_summary">%1$d bills · Rs %2$.0f paid · Rs %3$.0f pending</string>
 <string name="appointment_value">Appointment %1$s · %2$s</string>
     <string name="reschedule_phone">9230755876</string>
-    <string name="payment_description_prebook">50%% prebook advance (non-refundable)</string>
+    <string name="payment_description_prebook" formatted="false">50% prebook advance (non-refundable)</string>
     <string name="payment_description_pending">Pending bill %1$s</string>
     <string name="complete_profile_banner">Add your clinic-registered mobile number to book tests and pay bills online.</string>
     <string name="login_welcome">Welcome back</string>
@@ -435,7 +435,7 @@
     <string name="preferred_time_bn">পছন্দের সময়</string>
     <string name="prebook_time_slot_bn">আপনার টেস্ট বুক করুন</string>
     <string name="total_amount_bn">মোট টাকা</string>
-    <string name="pay_advance_bn">৫০%% অ্যাডভান্স দিন</string>
+    <string name="pay_advance_bn" formatted="false">৫০% অ্যাডভান্স দিন</string>
     <string name="patient_age_bn">বয়স (বছর)</string>
     <string name="patient_sex_bn">লিঙ্গ</string>
     <string name="slots_remaining_bn">%1$s (%2$dটি বাকি)</string>
@@ -594,7 +594,7 @@
 <string name="bill_summary_bn">%1$s — %2$s\n₹%3$.0f জমা ₹%4$.0f বাকি ₹%5$.0f</string>
 <string name="bill_register_summary_bn">%1$dটি বিল · Rs %2$.0f জমা · Rs %3$.0f বাকি</string>
 <string name="appointment_value_bn">অ্যাপয়েন্টমেন্ট %1$s · %2$s</string>
-    <string name="payment_description_prebook_bn">৫০%% প্রিবুক অ্যাডভান্স (ফেরত হয় না)</string>
+    <string name="payment_description_prebook_bn" formatted="false">৫০% প্রিবুক অ্যাডভান্স (ফেরত হয় না)</string>
     <string name="payment_description_pending_bn">বকেয়া বিল %1$s</string>
     <string name="payment_not_configured_bn">পেমেন্ট গেটওয়ে চালু করা নেই। অনুগ্রহ করে ক্লিনিকে যোগাযোগ করুন।</string>
     <string name="complete_profile_banner_bn">অনলাইনে টেস্ট বুক আর বিল মেটাতে ক্লিনিকে রেজিস্টার করা মোবাইল নম্বরটি যুক্ত করুন।</string>
