@@ -18,6 +18,11 @@
 -keepclassmembers,allowobfuscation class * {
     @com.google.gson.annotations.SerializedName <fields>;
 }
+# R8 full mode (the AGP 8 default) drops generic signatures even with -keepattributes
+# Signature unless the class itself is kept. ReportCache and the booking screen read
+# List<T> through anonymous TypeToken subclasses. These are the rules Gson 2.11 ships.
+-keep,allowobfuscation,allowshrinking class com.google.gson.reflect.TypeToken
+-keep,allowobfuscation,allowshrinking class * extends com.google.gson.reflect.TypeToken
 
 # --- Retrofit -----------------------------------------------------------------
 # Service interfaces are implemented by a runtime proxy driven off their annotations.
@@ -28,6 +33,13 @@
 -keepclassmembers,allowshrinking,allowobfuscation interface com.anubhav.app.data.remote.** {
     @retrofit2.http.* <methods>;
 }
+# Retrofit 2.9 reads each suspend method's Continuation<Response<T>> signature at
+# runtime. Without these (shipped by Retrofit 2.10+) R8 full mode strips it and EVERY
+# API call fails with "Class cannot be cast to ParameterizedType" - which broke clinic
+# login, report lookup, bookings and payments in release builds.
+-keep,allowobfuscation,allowshrinking interface retrofit2.Call
+-keep,allowobfuscation,allowshrinking class retrofit2.Response
+-keep,allowobfuscation,allowshrinking class kotlin.coroutines.Continuation
 -dontwarn okhttp3.internal.platform.**
 -dontwarn org.conscrypt.**
 -dontwarn org.bouncycastle.**

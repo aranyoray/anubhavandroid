@@ -208,11 +208,13 @@ class MyReportsFragment : Fragment() {
         }
     }
 
+    /** With no verified phone yet (guest, Google/email sign-in) the lookup finds their OWN reports. */
+    private val lookupTitle: Int
+        get() = if (shownPhone.isBlank()) R.string.verify_dialog_title_login else R.string.verify_dialog_title_fetch
+
     private fun addFetchOtherButton() {
-        // With no verified phone yet (guest, Google/email sign-in) this finds their OWN reports.
-        val title = if (shownPhone.isBlank()) R.string.verify_dialog_title_login else R.string.verify_dialog_title_fetch
         listContainer.addView(Button(requireContext()).apply {
-            text = localized(title); isAllCaps = false
+            text = localized(lookupTitle); isAllCaps = false
             layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(18) }
             setOnClickListener { showFetchOtherDialog() }
         })
@@ -223,7 +225,7 @@ class MyReportsFragment : Fragment() {
         val ctx = requireContext()
         val form = ReportLookupForm(ctx, layoutInflater, prefillPhone)
         val dialog = AlertDialog.Builder(ctx)
-            .setTitle(localized(R.string.verify_dialog_title_fetch))
+            .setTitle(localized(lookupTitle))
             .setView(form.view)
             .setPositiveButton(localized(R.string.verify_positive_find), null)
             .setNegativeButton(localized(R.string.cancel), null)
