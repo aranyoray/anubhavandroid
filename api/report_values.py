@@ -1,10 +1,19 @@
 """Structured pathology result values for a bill — powers the report visualizer.
 
 Reads the LIVE AKTIV MSSQL per-department result tables (CHEMICAL_DTLS,
-HAEMATOLOGY_DTLS, HORMONE_DTLS, …). These are NOT mirrored to Neon, so this needs
-the clinic PC to be up. Each *_DTLS row is one analyte with its result, unit and
-reference range (snapshotted at report time). There is no stored high/low flag —
-we compute it by parsing RESULT against LOWER_RANGE/UPPER_RANGE.
+HAEMATOLOGY_DTLS, HORMONE_DTLS, SEROLOGY_DTLS, …). These are NOT mirrored to
+Neon, so this needs the clinic PC to be up. Each *_DTLS row is one analyte with
+its result, unit and reference range (snapshotted at report time). There is no
+stored high/low flag — we compute it by parsing RESULT against the low/high range.
+
+Two keying strategies per the AKTIV schema:
+  - bill_key   : the *_DTLS table has a BILL_KEY column (chemistry, haematology,
+                 hormone, urine, fluids).
+  - report_key : the *_DTLS table has only REPORT_KEY; join its *_HEAD (which
+                 carries BILL_KEY) on REPORT_KEY (serology, micro, mantoux, …).
+Column names vary across AKTIV installs, so the exact result/parameter/unit/
+range columns are discovered from INFORMATION_SCHEMA rather than hard-coded —
+a table keyed or named differently is skipped, not fatal.
 """
 from __future__ import annotations
 
@@ -13,13 +22,30 @@ from typing import Any
 
 from db import fetch_all, mssql_conn
 
-# CATEGORY_KEY routes to a department table, but rather than depend on the exact
-# category→table map we simply probe every department's *_DTLS by BILL_KEY (all of
-# them carry BILL_KEY). A missing table on some installs is skipped, not fatal.
-DEPT_TABLES = [
-    "CHEMICAL", "HAEMATOLOGY", "HORMONE", "IMMUNOLOGY",
-    "FLUID", "MICRO", "MISCL", "MIXED", "MANTOUX",
+# (dtls_table, strategy, head_table). strategy "bill_key" filters d.BILL_KEY;
+# "report_key" joins head_table h ON h.REPORT_KEY = d.REPORT_KEY, filters h.BILL_KEY.
+DEPT_TABLES: list[tuple[str, str, str | None]] = [
+    ("CHEMICAL_DTLS", "bill_key", None),
+    ("HAEMATOLOGY_DTLS", "bill_key", None),
+    ("HORMONE_DTLS", "bill_key", None),
+    ("IMMUNOLOGY_DTLS", "bill_key", None),
+    ("URINE_DTLS", "bill_key", None),
+    ("URINALYSIS_DTLS", "bill_key", None),
+    ("BODYFLUID_DTLS", "bill_key", None),
+    ("FLUID_DTLS", "bill_key", None),
+    ("SEROLOGY_DTLS", "report_key", "SEROLOGY_HEAD"),
+    ("MICRO_DTLS", "report_key", "MICRO_HEAD"),
+    ("MANTOUX_DTLS", "report_key", "MANTOUX_HEAD"),
+    ("CYTOLOGY_DTLS", "report_key", "CYTOLOGY_HEAD"),
 ]
+
+# Candidate column names (first match wins), matched case-insensitively.
+PARAM_COLS = ["PARAMETER", "TESTNAME", "TEST_NAME", "PARTICULARS", "INVESTIGATION", "ANALYTE", "NAME"]
+RESULT_COLS = ["RESULT", "RESULTVALUE", "RESULT_VALUE", "VALUE", "OBSERVEDVALUE", "REPORTVALUE", "REPORT_VALUE"]
+UNIT_COLS = ["UNITNAME", "UNIT", "UNITS"]
+RANGE_COLS = ["NORMALRANGE", "NORMAL_RANGE", "BIOREFRANGE", "REFRANGE", "REF_RANGE", "REFERENCERANGE", "RANGE"]
+LOW_COLS = ["LOWER_RANGE", "LOWRANGE", "LOW_RANGE", "MIN_RANGE", "MINVALUE", "MIN_VALUE", "L_RANGE"]
+HIGH_COLS = ["UPPER_RANGE", "HIGHRANGE", "HIGH_RANGE", "MAX_RANGE", "MAXVALUE", "MAX_VALUE", "H_RANGE"]
 
 _NUM = re.compile(r"-?\d+(?:\.\d+)?")
 
@@ -36,8 +62,7 @@ def _norm_phone(phone: str | None) -> str:
 
 
 def _flag(result: Any, low: float | None, high: float | None) -> str:
-    """NORMAL / LOW / HIGH. Text results (no numeric value) or params with no
-    numeric range are treated as NORMAL (not flagged)."""
+    """NORMAL / LOW / HIGH. Text results or params with no numeric range are NORMAL."""
     value = _num(result)
     if value is None or (low is None and high is None):
         return "NORMAL"
@@ -46,6 +71,30 @@ def _flag(result: Any, low: float | None, high: float | None) -> str:
     if high is not None and value > high:
         return "HIGH"
     return "NORMAL"
+
+
+def _columns(cur, table: str) -> dict[str, str]:
+    """UPPER-name -> real column name for a table, or {} if the table is absent."""
+    try:
+        rows = fetch_all(
+            cur,
+            "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = %s",
+            (table,),
+        )
+    except Exception:
+        return {}
+    return {(r["COLUMN_NAME"] or "").upper(): r["COLUMN_NAME"] for r in rows}
+
+
+def _pick(cols: dict[str, str], candidates: list[str]) -> str | None:
+    for c in candidates:
+        if c in cols:
+            return cols[c]
+    return None
+
+
+def _as_str(value: Any) -> str:
+    return str(value).strip() if value is not None else ""
 
 
 def report_values(*, bill_key: int, phone: str | None = None) -> dict[str, Any]:
@@ -72,43 +121,71 @@ def report_values(*, bill_key: int, phone: str | None = None) -> dict[str, Any]:
             (bill_key,),
         )
         confirmed = {r["report_key"] for r in confirmed_rows}
-        if not confirmed:
-            return _envelope(h, [])
 
         by_report: dict[tuple, list[dict]] = {}
-        for dept in DEPT_TABLES:
-            try:
-                rows = fetch_all(
-                    cur,
-                    f"""
-                    SELECT d.REPORT_KEY AS report_key, d.PARAMETER AS parameter,
-                           d.RESULT AS result, d.UNITNAME AS unit,
-                           d.NORMALRANGE AS range_text, d.LOWER_RANGE AS low,
-                           d.UPPER_RANGE AS high, d.TEST_KEY AS test_key,
-                           RTRIM(ISNULL(t.testname,'')) AS test_name
-                    FROM {dept}_DTLS d
-                    LEFT JOIN MAST_TEST t ON t.test_key = d.TEST_KEY
-                    WHERE d.BILL_KEY = %s
-                    ORDER BY d.REPORT_DTLS_KEY
-                    """,
-                    (bill_key,),
+        for table, strategy, head_table in DEPT_TABLES:
+            cols = _columns(cur, table)
+            if not cols:
+                continue
+            param_c = _pick(cols, PARAM_COLS)
+            if not param_c:
+                continue  # nothing to label a row with
+            result_c = _pick(cols, RESULT_COLS)
+            unit_c = _pick(cols, UNIT_COLS)
+            range_c = _pick(cols, RANGE_COLS)
+            low_c = _pick(cols, LOW_COLS)
+            high_c = _pick(cols, HIGH_COLS)
+            rk_c = cols.get("REPORT_KEY")
+            tk_c = cols.get("TEST_KEY")
+
+            def dcol(name: str | None) -> str:
+                return f"d.[{name}]" if name else "NULL"
+
+            select = [
+                f"{dcol(rk_c)} AS report_key",
+                f"d.[{param_c}] AS parameter",
+                f"{dcol(result_c)} AS result",
+                f"{dcol(unit_c)} AS unit",
+                f"{dcol(range_c)} AS range_text",
+                f"{dcol(low_c)} AS low",
+                f"{dcol(high_c)} AS high",
+                ("RTRIM(ISNULL(t.testname,'')) AS test_name" if tk_c else "'' AS test_name"),
+            ]
+            join = f"LEFT JOIN MAST_TEST t ON t.test_key = d.[{tk_c}]" if tk_c else ""
+
+            if strategy == "bill_key" and "BILL_KEY" in cols:
+                sql = f"SELECT {', '.join(select)} FROM {table} d {join} WHERE d.[{cols['BILL_KEY']}] = %s"
+            elif strategy == "report_key" and rk_c and head_table:
+                sql = (
+                    f"SELECT {', '.join(select)} FROM {table} d "
+                    f"INNER JOIN {head_table} h ON h.REPORT_KEY = d.[{rk_c}] {join} "
+                    f"WHERE h.BILL_KEY = %s"
                 )
+            elif "BILL_KEY" in cols:  # some installs add BILL_KEY to report_key tables
+                sql = f"SELECT {', '.join(select)} FROM {table} d {join} WHERE d.[{cols['BILL_KEY']}] = %s"
+            else:
+                continue
+
+            try:
+                rows = fetch_all(cur, sql, (bill_key,))
             except Exception:
-                continue  # table absent on this install / transient — skip department
+                continue
+
             for r in rows:
                 rk = r["report_key"]
-                if rk not in confirmed:
+                # When the department links reports, only show authorised ones.
+                if confirmed and rk is not None and rk not in confirmed:
                     continue
-                low, high = _num(r["low"]), _num(r["high"])
                 name = (r["parameter"] or "").strip()
                 if not name:
                     continue
-                by_report.setdefault((dept, rk, (r["test_name"] or "").strip()), []).append(
+                low, high = _num(r["low"]), _num(r["high"])
+                by_report.setdefault((table, rk, (r["test_name"] or "").strip()), []).append(
                     {
                         "name": name,
-                        "result": (r["result"] or "").strip(),
-                        "unit": (r["unit"] or "").strip(),
-                        "range": (r["range_text"] or "").strip(),
+                        "result": _as_str(r["result"]),
+                        "unit": _as_str(r["unit"]),
+                        "range": _as_str(r["range_text"]),
                         "low": low,
                         "high": high,
                         "value": _num(r["result"]),
@@ -117,17 +194,15 @@ def report_values(*, bill_key: int, phone: str | None = None) -> dict[str, Any]:
                 )
 
     reports = [
-        {"category": dept, "report_key": rk, "test_name": test_name, "parameters": params}
-        for (dept, rk, test_name), params in by_report.items()
+        {"category": table.replace("_DTLS", ""), "report_key": rk, "test_name": test_name, "parameters": params}
+        for (table, rk, test_name), params in by_report.items()
         if params
     ]
     return _envelope(h, reports)
 
 
 def _envelope(h: dict, reports: list[dict]) -> dict[str, Any]:
-    abnormal = sum(
-        1 for r in reports for p in r["parameters"] if p["flag"] in ("LOW", "HIGH")
-    )
+    abnormal = sum(1 for r in reports for p in r["parameters"] if p["flag"] in ("LOW", "HIGH"))
     return {
         "bill_key": h["BILL_KEY"],
         "bill_no": h["bill_no"],
