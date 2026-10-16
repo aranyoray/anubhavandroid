@@ -31,6 +31,7 @@ import com.anubhav.app.data.model.StaffBillEdit
 import com.anubhav.app.data.model.StaffPermissions
 import com.anubhav.app.data.repository.AdminRepository
 import com.anubhav.app.data.repository.AktivRepository
+import com.anubhav.app.utils.AgeRules
 import com.anubhav.app.utils.ReportFetcher
 import com.anubhav.app.utils.StaffSession
 import com.anubhav.app.utils.localized
@@ -350,13 +351,19 @@ class AdminActivity : AppCompatActivity() {
         dialog.setOnShowListener {
             val save = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
             save.setOnClickListener {
+                val ageRaw = age.text.toString().trim()
+                if (ageRaw.isNotEmpty() && !AgeRules.isValid(ageRaw)) {
+                    age.error = localized(R.string.age_invalid)
+                    age.requestFocus()
+                    return@setOnClickListener
+                }
                 // Send only what changed, so an edit never rewrites fields nobody touched.
                 fun changed(new: String, old: String) = new.trim().takeIf { it != old.trim() }
                 val edit = StaffBillEdit(
                     patientName = changed(name.text.toString(), bill.patientName),
                     phone = changed(phone.text.toString(), bill.phone),
                     sex = sex.selectedTag()?.takeIf { it != bill.sex },
-                    ageYear = age.text.toString().toIntOrNull()?.takeIf { it != bill.ageYear },
+                    ageYear = AgeRules.parse(ageRaw)?.takeIf { it != bill.ageYear },
                     remarks = changed(remarks.text.toString(), bill.remarks),
                 )
                 if (edit == StaffBillEdit()) {
@@ -466,12 +473,18 @@ class AdminActivity : AppCompatActivity() {
                     Toast.makeText(this, localized(R.string.admin_booking_fill), Toast.LENGTH_LONG).show()
                     return@setOnClickListener
                 }
+                val ageRaw = age.text.toString().trim()
+                if (ageRaw.isNotEmpty() && !AgeRules.isValid(ageRaw)) {
+                    age.error = localized(R.string.age_invalid)
+                    age.requestFocus()
+                    return@setOnClickListener
+                }
                 create.isEnabled = false
                 val request = AktivBookingRequest(
                     patientName = name.text.toString().trim(),
                     phone = digits,
                     sex = sex.selectedTag() ?: "MALE",
-                    ageYear = age.text.toString().toIntOrNull(),
+                    ageYear = AgeRules.parse(ageRaw),
                     testKeys = picked.keys.toList(),
                     amountPaid = paid.text.toString().toDoubleOrNull(),
                     receiptMode = mode.selectedTag() ?: "CASH",

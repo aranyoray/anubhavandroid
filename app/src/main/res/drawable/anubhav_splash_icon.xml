@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Inset the square clinic logo so the circular splash mask on Android 12+ does
+     not clip its corners. -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/anubhav_splash_logo"
+    android:inset="18%" />

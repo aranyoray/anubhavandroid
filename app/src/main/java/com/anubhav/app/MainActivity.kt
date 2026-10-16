@@ -1,5 +1,9 @@
 package com.anubhav.app
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.AnimatorSet
+import android.animation.ObjectAnimator
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -8,6 +12,7 @@ import android.view.MenuItem
 import android.view.View
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.drawerlayout.widget.DrawerLayout
@@ -40,6 +45,26 @@ class MainActivity : AppCompatActivity(), PaymentResultListener {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Cold-start splash with the clinic logo. Held briefly, then the icon
+        // scales up and fades as it hands off to the app.
+        val splash = installSplashScreen()
+        val shownAt = System.currentTimeMillis()
+        splash.setKeepOnScreenCondition { System.currentTimeMillis() - shownAt < 650 }
+        splash.setOnExitAnimationListener { provider ->
+            val icon = provider.iconView
+            AnimatorSet().apply {
+                playTogether(
+                    ObjectAnimator.ofFloat(icon, View.ALPHA, 1f, 0f),
+                    ObjectAnimator.ofFloat(icon, View.SCALE_X, 1f, 1.25f),
+                    ObjectAnimator.ofFloat(icon, View.SCALE_Y, 1f, 1.25f),
+                )
+                duration = 350
+                addListener(object : AnimatorListenerAdapter() {
+                    override fun onAnimationEnd(animation: Animator) { provider.remove() }
+                })
+                start()
+            }
+        }
         super.onCreate(savedInstanceState)
         if (!CustomerSessionManager.isLoggedIn(this)) {
             startActivity(Intent(this, LoginActivity::class.java))

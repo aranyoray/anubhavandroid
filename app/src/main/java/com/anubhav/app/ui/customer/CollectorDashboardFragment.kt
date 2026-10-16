@@ -25,6 +25,7 @@ import com.anubhav.app.data.model.CollectorPatient
 import com.anubhav.app.data.model.CollectorPatientRequest
 import com.anubhav.app.data.model.CustomerReport
 import com.anubhav.app.data.repository.CustomerRepository
+import com.anubhav.app.utils.AgeRules
 import com.anubhav.app.utils.CollectorLogSharer
 import com.anubhav.app.utils.CustomerSessionManager
 import com.anubhav.app.utils.ReportPdfSharer
@@ -111,11 +112,17 @@ class CollectorDashboardFragment : Fragment() {
                 Toast.makeText(requireContext(), localized(R.string.collector_required), Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
+            val ageRaw = age.text?.toString()?.trim().orEmpty()
+            if (ageRaw.isNotEmpty() && !AgeRules.isValid(ageRaw)) {
+                age.error = localized(R.string.age_invalid)
+                age.requestFocus()
+                return@setOnClickListener
+            }
             val request = CollectorPatientRequest(
                 collectorUserKey = collectorKey,
                 patientName = cleanName,
                 phone = cleanPhone,
-                ageYear = age.text?.toString()?.toIntOrNull(),
+                ageYear = AgeRules.parse(ageRaw),
                 sex = sex.text?.toString()?.trim()?.ifBlank { null },
                 referredBy = referredBy.text?.toString()?.trim()?.ifBlank { null },
                 notes = notes.text?.toString()?.trim()?.ifBlank { null },

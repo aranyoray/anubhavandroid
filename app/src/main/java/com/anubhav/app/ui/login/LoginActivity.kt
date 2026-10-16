@@ -61,6 +61,8 @@ class LoginActivity : AppCompatActivity() {
     private lateinit var layoutLogin: View
     private lateinit var tvLoginError: TextView
     private lateinit var progressLogin: ProgressBar
+    private lateinit var loadingOverlay: View
+    private lateinit var tvLoadingLabel: TextView
     private lateinit var btnEmailAuth: MaterialButton
     private lateinit var btnPhoneAuth: MaterialButton
     private lateinit var etEmail: TextInputEditText
@@ -120,6 +122,8 @@ class LoginActivity : AppCompatActivity() {
         layoutLogin = findViewById(R.id.layoutLogin)
         tvLoginError = findViewById(R.id.tvLoginError)
         progressLogin = findViewById(R.id.progressLogin)
+        loadingOverlay = findViewById(R.id.loadingOverlay)
+        tvLoadingLabel = findViewById(R.id.tvLoadingLabel)
         btnEmailAuth = findViewById(R.id.btnEmailAuth)
         btnPhoneAuth = findViewById(R.id.btnPhoneAuth)
         etEmail = findViewById(R.id.etEmail)
@@ -341,7 +345,7 @@ class LoginActivity : AppCompatActivity() {
                 verifyButton.isEnabled = false
                 dialog.setCancelable(false)
                 dialog.getButton(AlertDialog.BUTTON_NEGATIVE).isEnabled = false
-                setLoading(true)
+                setLoading(true, R.string.verifying_ellipsis)
                 lifecycleScope.launch {
                     customerRepo.verify(input.name, input.phone10, input.bill).fold(
                         onSuccess = { r ->
@@ -554,8 +558,10 @@ class LoginActivity : AppCompatActivity() {
             localized(R.string.password)
     }
 
-    private fun setLoading(loading: Boolean) {
-        progressLogin.visibility = if (loading) View.VISIBLE else View.GONE
+    private fun setLoading(loading: Boolean, messageRes: Int = R.string.signing_you_in) {
+        if (loading) tvLoadingLabel.text = localized(messageRes)
+        loadingOverlay.visibility = if (loading) View.VISIBLE else View.GONE
+        progressLogin.visibility = View.GONE
         btnEmailAuth.isEnabled = !loading
         btnPhoneAuth.isEnabled = !loading
         findViewById<MaterialButton>(R.id.btnGoogle).isEnabled = !loading

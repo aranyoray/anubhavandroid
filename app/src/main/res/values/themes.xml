@@ -32,6 +32,14 @@
     <!-- Customer-facing app theme (alias) -->
     <style name="Theme.AnubhavLifeCare" parent="Theme.AktivAdmin" />
     <style name="Theme.AnubhavLifeCare.NoActionBar" parent="Theme.AktivAdmin.NoActionBar" />
+
+    <!-- Cold-start splash (androidx core-splashscreen). Shows the clinic logo on a
+         clean background, then hands off to the real NoActionBar theme. -->
+    <style name="Theme.AnubhavLifeCare.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/card_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/anubhav_splash_icon</item>
+        <item name="postSplashScreenTheme">@style/Theme.AnubhavLifeCare.NoActionBar</item>
+    </style>
     <style name="Theme.AnubhavLifeCare.AppBarOverlay" parent="Theme.AktivAdmin.AppBarOverlay" />
     <style name="Theme.AnubhavLifeCare.PopupOverlay" parent="Theme.AktivAdmin.PopupOverlay" />
 

@@ -27,6 +27,7 @@ import com.anubhav.app.data.repository.AktivRepository
 import com.anubhav.app.data.repository.CustomerRepository
 import com.anubhav.app.ui.booking.AktivTestAdapter
 import com.anubhav.app.ui.location.MapPickerFragment
+import com.anubhav.app.utils.AgeRules
 import com.anubhav.app.utils.CustomerSessionManager
 import com.anubhav.app.utils.LocationHelper
 import com.anubhav.app.utils.PaymentManager
@@ -216,6 +217,11 @@ class CustomerPrebookFragment : Fragment(), PaymentResultListener {
             val age = etAge.text?.toString()?.trim().orEmpty()
             if (name.isBlank() || age.isBlank() || selectedTests.isEmpty() || selectedDate == null || selectedSlot == null) {
                 Toast.makeText(requireContext(), localized(R.string.fill_all_fields), Toast.LENGTH_LONG).show()
+                return@setOnClickListener
+            }
+            if (!AgeRules.isValid(age)) {
+                etAge.error = localized(R.string.age_invalid)
+                etAge.requestFocus()
                 return@setOnClickListener
             }
             val total = selectedTests.values.sumOf { it.rate }
@@ -540,7 +546,7 @@ class CustomerPrebookFragment : Fragment(), PaymentResultListener {
                 patientName = etName.text?.toString()?.trim().orEmpty(),
                 phone = phone,
                 sex = selectedSex,
-                ageYear = etAge.text?.toString()?.toIntOrNull(),
+                ageYear = AgeRules.parse(etAge.text?.toString()),
                 testKeys = selectedTests.keys.toList(),
                 slotDate = selectedDate.orEmpty(),
                 timeSlot = selectedSlot.orEmpty(),
