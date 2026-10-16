@@ -1,12 +1,9 @@
 package com.anubhav.app.ui.login
 
-import android.app.DatePickerDialog
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.text.Editable
 import android.text.InputType
-import android.text.TextWatcher
 import android.view.View
 import android.widget.EditText
 import android.widget.ImageView
@@ -14,13 +11,12 @@ import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
-import java.util.Calendar
-import java.util.Locale
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.anubhav.app.MainActivity
+import com.anubhav.app.ui.customer.ReportLookupForm
 import com.anubhav.app.R
 import com.anubhav.app.data.repository.AdminRepository
 import com.anubhav.app.data.repository.CustomerRepository
@@ -222,6 +218,7 @@ class LoginActivity : AppCompatActivity() {
 
         btnEmailAuth.setOnClickListener { handleEmailAuth() }
         btnPhoneAuth.setOnClickListener { handlePhoneAuth() }
+        findViewById<MaterialButton>(R.id.btnGuest).setOnClickListener { continueAsGuest() }
 
         findViewById<TextView>(R.id.tvForgotPassword).setOnClickListener {
             val email = etEmail.text?.toString()?.trim().orEmpty()
@@ -325,72 +322,28 @@ class LoginActivity : AppCompatActivity() {
     }
 
     /**
-     * AKTIV 2-of-3 verification (no OTP): patient enters Name, Bill No OR Bill Date, Phone.
-     * Any two matching a bill logs them in — so a wrong phone still works via name + bill.
-     * More secure than phone-only (a phone number alone shouldn't unlock someone's reports).
+     * AKTIV verification (no OTP): the patient enters name, phone and bill number, and all
+     * three must match one bill - the phone exactly, the bill by its last 3-4 digits and the
+     * name loosely. A phone number alone shouldn't unlock someone's reports.
      */
     private fun showClinicVerifyDialog(prefillPhone: String) {
-        val form = layoutInflater.inflate(R.layout.dialog_report_lookup, null)
-        form.findViewById<TextView>(R.id.tvLookupHelp).text = localized(R.string.verify_dialog_message_short)
-        form.findViewById<TextInputLayout>(R.id.layoutLookupName).hint = localized(R.string.verify_patient_name_hint)
-        form.findViewById<TextInputLayout>(R.id.layoutLookupPhone).hint = localized(R.string.verify_phone_hint)
-        form.findViewById<TextView>(R.id.tvLookupDateLabel).text = localized(R.string.verify_bill_date_label)
-        form.findViewById<TextView>(R.id.tvLookupBillLabel).text = localized(R.string.verify_bill_no_label)
-        form.findViewById<TextView>(R.id.tvLookupOr).text = localized(R.string.verify_or_short)
-        form.findViewById<TextView>(R.id.tvLookupBillHint).text = localized(R.string.verify_bill_digits_hint)
-        val etName = form.findViewById<TextInputEditText>(R.id.etLookupName)
-        val etPhone = form.findViewById<TextInputEditText>(R.id.etLookupPhone).apply { setText(prefillPhone) }
-        val etBill = form.findViewById<EditText>(R.id.etLookupBillDigits)
-        val dateBtn = form.findViewById<MaterialButton>(R.id.btnLookupDate).apply {
-            text = localized(R.string.verify_pick_date_short)
-        }
-        var billDateIso: String? = null
-        dateBtn.setOnClickListener {
-            val c = Calendar.getInstance()
-            DatePickerDialog(this, { _, y, m, day ->
-                billDateIso = String.format(Locale.US, "%04d-%02d-%02d", y, m + 1, day)
-                dateBtn.text = String.format(Locale.US, "%02d/%02d/%04d", day, m + 1, y)
-                etBill.text?.clear()
-            }, c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH)).show()
-        }
-        etBill.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                if (!s.isNullOrEmpty() && billDateIso != null) {
-                    billDateIso = null
-                    dateBtn.text = localized(R.string.verify_pick_date_short)
-                }
-            }
-            override fun afterTextChanged(s: Editable?) = Unit
-        })
-
+        val form = ReportLookupForm(this, layoutInflater, prefillPhone)
         val dialog = AlertDialog.Builder(this)
             .setTitle(localized(R.string.verify_dialog_title_login))
-            .setView(form)
+            .setView(form.view)
             .setPositiveButton(localized(R.string.verify_positive_view), null)
             .setNegativeButton(localized(R.string.cancel), null)
             .create()
         dialog.setOnShowListener {
             val verifyButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
             verifyButton.setOnClickListener {
-                val name = etName.text.toString().trim()
-                val phone = etPhone.text.toString().trim()
-                val bill = etBill.text.toString().trim()
-                if (bill.isNotEmpty() && bill.length < 3) {
-                    etBill.error = localized(R.string.verify_bill_digits_required)
-                    return@setOnClickListener
-                }
-                val provided = listOf(name.isNotEmpty(), bill.isNotEmpty() || billDateIso != null, phone.isNotEmpty()).count { it }
-                if (provided < 2) {
-                    Toast.makeText(this, localized(R.string.verify_fill_two_fields), Toast.LENGTH_SHORT).show()
-                    return@setOnClickListener
-                }
+                val input = form.validInput() ?: return@setOnClickListener
                 verifyButton.isEnabled = false
                 dialog.setCancelable(false)
                 dialog.getButton(AlertDialog.BUTTON_NEGATIVE).isEnabled = false
                 setLoading(true)
                 lifecycleScope.launch {
-                    customerRepo.verify(name, phone, bill, billDateIso).fold(
+                    customerRepo.verify(input.name, input.phone10, input.bill).fold(
                         onSuccess = { r ->
                             verifyButton.isEnabled = true
                             dialog.setCancelable(true)
@@ -427,6 +380,12 @@ class LoginActivity : AppCompatActivity() {
             }
         }
         dialog.show()
+    }
+
+    /** Browse without an account: home, booking catalog, health library, and reports via the lookup. */
+    private fun continueAsGuest() {
+        CustomerSessionManager.saveGuest(this)
+        openMain()
     }
 
     private fun handleEmailAuth() {
@@ -580,6 +539,7 @@ class LoginActivity : AppCompatActivity() {
         findViewById<MaterialButton>(R.id.btnGoogle).text = localized(R.string.login_with_google)
         findViewById<MaterialButton>(R.id.btnFacebook).text = localized(R.string.login_with_facebook)
         btnPhoneAuth.text = localized(R.string.continue_with_phone)
+        findViewById<MaterialButton>(R.id.btnGuest).text = localized(R.string.continue_as_guest)
         btnEmailAuth.text = localized(if (isSignUpMode) R.string.sign_up_with_email else R.string.login_with_email)
         findViewById<TextView>(R.id.tvForgotPassword).text = localized(R.string.forgot_password)
         findViewById<TextView>(R.id.tvToggleAuthMode).text = localized(

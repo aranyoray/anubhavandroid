@@ -1,7 +1,6 @@
 import sys
 import types
 import unittest
-from datetime import date
 from pathlib import Path
 from unittest.mock import patch
 
@@ -42,71 +41,78 @@ class BillMonthTests(unittest.TestCase):
         self.assertEqual(pm._bill_serial("2024/02/ALC/3"), "3")
 
 
-class SerialMonthScopingTests(unittest.TestCase):
-    """ALC serials reset to 001 every month; a serial+name must not resolve to a
-    same-serial bill from a *different* month when the bill date is known."""
+PHONE = "9230755875"
 
-    def test_wrong_month_serial_rejected_when_date_given(self):
-        # Patient asks for January bill (serial 3); a February bill also has serial 3.
-        feb = _row("2024/02/ALC/003", "15/02/2024")
-        score = pm._score_row(
-            feb, name="PRITI DAS", phone_n="", phone_valid=False,
-            serial="3", bdate=date(2024, 1, 20), month_prefix="2024/01",
-        )
-        self.assertEqual(score, 1)  # name only — serial does NOT count (wrong month)
 
-    def test_correct_month_serial_counts(self):
-        jan = _row("2024/01/ALC/003", "20/01/2024")
-        score = pm._score_row(
-            jan, name="PRITI DAS", phone_n="", phone_valid=False,
-            serial="3", bdate=date(2024, 1, 20), month_prefix="2024/01",
-        )
-        self.assertEqual(score, 2)  # name + in-month serial
+class AllThreeMatchTests(unittest.TestCase):
+    """Phone exact, bill number (full or last 3-4 digits) and a fuzzy name must all match."""
 
-    def test_serial_without_date_is_month_agnostic(self):
-        # No date -> month unknown -> serial still matches (backward compatible path).
-        feb = _row("2024/02/ALC/003", "15/02/2024")
-        score = pm._score_row(
-            feb, name="PRITI DAS", phone_n="", phone_valid=False,
-            serial="3", bdate=None, month_prefix=None,
-        )
-        self.assertEqual(score, 2)
+    def matches(self, row, name="PRITI DAS", phone=PHONE, serial="4171", month=None):
+        return pm._row_matches(row, name, pm._norm_phone(phone), serial, month)
 
-    def test_exact_date_still_counts_as_bill_factor(self):
-        jan = _row("2024/01/ALC/007", "20/01/2024")
-        score = pm._score_row(
-            jan, name="PRITI DAS", phone_n="", phone_valid=False,
-            serial="", bdate=date(2024, 1, 20), month_prefix="2024/01",
-        )
-        self.assertEqual(score, 2)  # name + exact bill date
+    def test_full_and_three_or_four_digit_tail_match(self):
+        row = _row("2026/09/ALC/4171", "20/09/2026", phone=PHONE)
+        for serial in ("4171", "171"):
+            with self.subTest(serial=serial):
+                self.assertTrue(self.matches(row, serial=serial))
 
-    def test_phone_and_last_three_digits_match_four_digit_serial(self):
-        row = _row("2026/09/ALC/4171", "20/09/2026", phone="9230755875")
-        self.assertEqual(pm._score_row(
-            row, name="", phone_n="9230755875", phone_valid=True,
-            serial="171", bdate=None, month_prefix=None,
-        ), 2)
+    def test_zero_prefixed_tail_matches_four_digit_serial(self):
+        self.assertTrue(self.matches(_row("2026/09/ALC/1003", "20/09/2026", phone=PHONE), serial="003"))
 
-    def test_shortened_serial_without_phone_does_not_unlock_report(self):
-        row = _row("2026/09/ALC/4171", "20/09/2026")
-        self.assertEqual(pm._score_row(
-            row, name="PRITI DAS", phone_n="", phone_valid=False,
-            serial="171", bdate=None, month_prefix=None,
-        ), 1)
+    def test_two_digit_tail_is_too_loose(self):
+        self.assertFalse(self.matches(_row("2026/09/ALC/4171", "20/09/2026", phone=PHONE), serial="71"))
 
-    def test_phone_and_zero_prefixed_tail_match_four_digit_serial(self):
-        row = _row("2026/09/ALC/1003", "20/09/2026", phone="9230755875")
-        self.assertEqual(pm._score_row(
-            row, name="", phone_n="9230755875", phone_valid=True,
-            serial="003", bdate=None, month_prefix=None,
-        ), 2)
+    def test_phone_must_match_in_full(self):
+        row = _row("2026/09/ALC/4171", "20/09/2026", phone=PHONE)
+        self.assertFalse(self.matches(row, phone="9230755876"))
 
-    def test_verify_returns_report_for_phone_and_three_digit_tail(self):
-        row = {**_row("2026/09/ALC/1003", "20/09/2026", phone="9230755875"), "bill_key": 42}
-        with patch.object(pm, "_candidates_mssql", return_value=[row]):
-            result = pm.verify_customer("", "9230755875", "003")
+    def test_misspelt_or_partial_names_still_match(self):
+        row = _row("2026/09/ALC/4171", "20/09/2026", name="PRITI SHARMA BANERJEE", phone=PHONE)
+        for name in ("Priti Sharma Banerjee", "Preeti Sarma", "priti", "Priti Banerji", "Sharma Priti"):
+            with self.subTest(name=name):
+                self.assertTrue(self.matches(row, name=name))
+
+    def test_a_different_name_does_not_match(self):
+        row = _row("2026/09/ALC/4171", "20/09/2026", name="PRITI DAS", phone=PHONE)
+        self.assertFalse(self.matches(row, name="Sumit Roy"))
+
+    def test_full_bill_number_pins_the_month(self):
+        # ALC serials restart monthly: 2024/01/ALC/003 must not open February's 003.
+        feb = _row("2024/02/ALC/003", "15/02/2024", phone=PHONE)
+        self.assertFalse(self.matches(feb, serial="003", month="2024/01"))
+        self.assertTrue(self.matches(feb, serial="003", month="2024/02"))
+
+
+class VerifyInputTests(unittest.TestCase):
+    def verify(self, name="Priti Das", phone=PHONE, bill="171", rows=()):
+        with patch.object(pm, "_candidates_mssql", return_value=list(rows)):
+            return pm.verify_customer(name, phone, bill)
+
+    def test_all_three_fields_are_required(self):
+        for kwargs in ({"name": ""}, {"phone": ""}, {"bill": ""}):
+            with self.subTest(**kwargs), self.assertRaises(ValueError):
+                self.verify(**kwargs)
+
+    def test_phone_needs_all_ten_digits(self):
+        with self.assertRaises(ValueError):
+            self.verify(phone="923075587")
+
+    def test_bill_needs_at_least_three_digits(self):
+        with self.assertRaises(ValueError):
+            self.verify(bill="71")
+
+    def test_verify_returns_report_for_name_phone_and_three_digit_tail(self):
+        row = {**_row("2026/09/ALC/1003", "20/09/2026", phone=PHONE), "bill_key": 42}
+        result = self.verify(name="Preeti Das", bill="003", rows=[row])
         self.assertTrue(result["matched"])
+        self.assertEqual(result["phone"], PHONE)
         self.assertEqual(result["bills"][0]["bill_no"], "2026/09/ALC/1003")
+
+    def test_no_match_returns_no_phone(self):
+        row = {**_row("2026/09/ALC/1003", "20/09/2026", phone=PHONE), "bill_key": 42}
+        result = self.verify(name="Sumit Roy", bill="003", rows=[row])
+        self.assertFalse(result["matched"])
+        self.assertEqual(result["phone"], "")
 
 
 if __name__ == "__main__":

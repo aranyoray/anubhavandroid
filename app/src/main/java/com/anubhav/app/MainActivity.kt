@@ -160,11 +160,12 @@ class MainActivity : AppCompatActivity(), PaymentResultListener {
         val banner = findViewById<View>(R.id.profileBanner)
         val phone = CustomerSessionManager.getPhone(this)
         if (phone.isNullOrBlank()) {
+            val guest = CustomerSessionManager.isGuest(this)
             banner.visibility = View.VISIBLE
             banner.findViewById<TextView>(R.id.tvBannerTitle).text =
-                localized(R.string.phone_required_title)
+                localized(if (guest) R.string.guest_banner_title else R.string.phone_required_title)
             banner.findViewById<TextView>(R.id.tvBannerMessage).text =
-                localized(R.string.complete_profile_banner)
+                localized(if (guest) R.string.guest_banner_message else R.string.complete_profile_banner)
             banner.findViewById<View>(R.id.btnBannerWhatsApp).setOnClickListener {
                 openWhatsAppChat()
             }
@@ -212,10 +213,14 @@ class MainActivity : AppCompatActivity(), PaymentResultListener {
             localized(R.string.nav_header_title)
         headerView.findViewById<TextView>(R.id.navHeaderSubtitle)?.text =
             localized(R.string.nav_header_subtitle)
-        val name = CustomerSessionManager.getName(this)
-            ?: CustomerSessionManager.getPhone(this)
-            ?: CustomerSessionManager.getEmail(this)
-            ?: ""
+        val name = if (CustomerSessionManager.isGuest(this)) {
+            localized(R.string.guest_name)
+        } else {
+            CustomerSessionManager.getName(this)
+                ?: CustomerSessionManager.getPhone(this)
+                ?: CustomerSessionManager.getEmail(this)
+                ?: ""
+        }
         headerView.findViewById<TextView>(R.id.navHeaderUser)?.text =
             localized(R.string.logged_in_as, name)
     }
@@ -230,7 +235,9 @@ class MainActivity : AppCompatActivity(), PaymentResultListener {
         menu.findItem(R.id.nav_collector)?.title = localized(R.string.menu_collector)
         menu.findItem(R.id.nav_pending_payments)?.title = localized(R.string.pending_payments_title)
         menu.findItem(R.id.nav_settings)?.title = localized(R.string.menu_settings)
-        menu.findItem(R.id.nav_logout)?.title = localized(R.string.logout)
+        // A guest has nothing to log out of; the same item takes them to sign-in.
+        menu.findItem(R.id.nav_logout)?.title =
+            localized(if (CustomerSessionManager.isGuest(this)) R.string.sign_in else R.string.logout)
     }
 
     private fun openWhatsAppChat() {

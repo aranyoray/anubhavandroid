@@ -234,7 +234,7 @@
     <string name="report_fallback">Report</string>
     <string name="report_status_pending">PENDING</string>
     <string name="report_ready_to_share">Ready to share</string>
-    <string name="reports_login_prompt">Please log in to see your reports.</string>
+    <string name="reports_login_prompt">Enter the patient name, mobile number and bill number to see reports.</string>
     <string name="reports_loading">Loading your reports…</string>
     <string name="reports_none_for_number">No reports found for this number.</string>
     <string name="reports_visit_count">%1$d visit(s) linked to your number</string>
@@ -329,24 +329,15 @@
     <!-- 2-of-3 report verification dialog (login + My Reports) -->
     <string name="verify_dialog_title_login">View your reports</string>
     <string name="verify_dialog_title_fetch">Fetch another report</string>
-    <string name="verify_dialog_message">Enter any two of: name, bill number/date, phone. With your phone, the last 3-4 digits of the bill number are enough.</string>
-    <string name="verify_dialog_message_short">Match any two: name, phone, or bill date/number. Use your phone with shortened bill digits.</string>
-    <string name="verify_bill_date_label">Bill date</string>
-    <string name="verify_or_short">OR</string>
-    <string name="verify_pick_date_short">Choose date</string>
-    <string name="verify_bill_digits_hint">last 3-4 digits</string>
+    <string name="verify_dialog_message_short">Enter all three: patient name, mobile number and bill number. The last 3 or 4 digits of the bill number are enough.</string>
+    <string name="verify_bill_digits_hint">last 3 or 4 digits</string>
     <string name="verify_bill_digits_required">Enter 3 or 4 digits</string>
     <string name="verify_patient_name_hint">Patient name</string>
     <string name="verify_phone_hint">Phone number</string>
-    <string name="verify_bill_no_hint">Bill number, e.g. 4171 (last digits)</string>
     <string name="verify_bill_no_label">Bill number</string>
-    <string name="verify_or_divider">— OR —</string>
-    <string name="verify_pick_bill_date">Pick bill date</string>
-    <string name="verify_bill_date_value">Bill date: %1$s</string>
     <string name="verify_positive_view">View reports</string>
     <string name="verify_positive_find">Find reports</string>
-    <string name="verify_fill_two_fields">Please fill at least two fields.</string>
-    <string name="verify_no_match">Details didn\'t match. Check your name, bill number/date and phone.</string>
+    <string name="verify_no_match">Details didn\'t match. Check the name, the full mobile number and the bill number.</string>
     <string name="verify_showing_reports_for">Showing reports for %1$s</string>
 
     <!-- Time Slots (legacy) -->
@@ -545,7 +536,7 @@
     <string name="report_fallback_bn">রিপোর্ট</string>
     <string name="report_status_pending_bn">তৈরি হচ্ছে</string>
     <string name="report_ready_to_share_bn">শেয়ারের জন্য তৈরি</string>
-    <string name="reports_login_prompt_bn">রিপোর্ট দেখতে লগ ইন করুন।</string>
+    <string name="reports_login_prompt_bn">রিপোর্ট দেখতে রোগীর নাম, মোবাইল নম্বর আর বিল নম্বর দিন।</string>
     <string name="reports_loading_bn">আপনার রিপোর্ট লোড হচ্ছে…</string>
     <string name="reports_none_for_number_bn">এই নম্বরে কোনও রিপোর্ট পাওয়া যায়নি।</string>
     <string name="reports_visit_count_bn">আপনার নম্বরে %1$dটি ভিজিট আছে</string>
@@ -640,24 +631,15 @@
     <!-- 2-of-3 report verification dialog (Bengali) -->
     <string name="verify_dialog_title_login_bn">আপনার রিপোর্ট দেখুন</string>
     <string name="verify_dialog_title_fetch_bn">আরেকটি রিপোর্ট আনুন</string>
-    <string name="verify_dialog_message_bn">নাম, বিল নম্বর/তারিখ, ফোন — যেকোনো দুটি দিন। ফোন নম্বর দিলে বিল নম্বরের শেষ ৩-৪টি সংখ্যাই যথেষ্ট।</string>
-    <string name="verify_dialog_message_short_bn">নাম, ফোন, বা বিলের তারিখ/নম্বর — যেকোনো দুটি মিলতে হবে। বিলের শেষ সংখ্যাগুলির সঙ্গে ফোন দিন।</string>
-    <string name="verify_bill_date_label_bn">বিলের তারিখ</string>
-    <string name="verify_or_short_bn">OR</string>
-    <string name="verify_pick_date_short_bn">তারিখ বাছুন</string>
-    <string name="verify_bill_digits_hint_bn">শেষ ৩-৪টি সংখ্যা</string>
+    <string name="verify_dialog_message_short_bn">তিনটিই দিন: রোগীর নাম, মোবাইল নম্বর আর বিল নম্বর। বিল নম্বরের শেষ ৩ বা ৪টি সংখ্যাই যথেষ্ট।</string>
+    <string name="verify_bill_digits_hint_bn">শেষ ৩ বা ৪টি সংখ্যা</string>
     <string name="verify_bill_digits_required_bn">৩ বা ৪টি সংখ্যা লিখুন</string>
     <string name="verify_patient_name_hint_bn">রোগীর নাম</string>
     <string name="verify_phone_hint_bn">মোবাইল নম্বর</string>
-    <string name="verify_bill_no_hint_bn">বিল নম্বর, যেমন 4171 (শেষের সংখ্যাগুলো)</string>
     <string name="verify_bill_no_label_bn">বিল নম্বর</string>
-    <string name="verify_or_divider_bn">— অথবা —</string>
-    <string name="verify_pick_bill_date_bn">বিলের তারিখ বেছে নিন</string>
-    <string name="verify_bill_date_value_bn">বিলের তারিখ: %1$s</string>
     <string name="verify_positive_view_bn">রিপোর্ট দেখুন</string>
     <string name="verify_positive_find_bn">রিপোর্ট খুঁজুন</string>
-    <string name="verify_fill_two_fields_bn">অন্তত দুটি ঘর পূরণ করুন।</string>
-    <string name="verify_no_match_bn">তথ্য মিলল না। নাম, বিল নম্বর/তারিখ আর ফোন নম্বর আরেকবার দেখে নিন।</string>
+    <string name="verify_no_match_bn">তথ্য মিলল না। নাম, পুরো মোবাইল নম্বর আর বিল নম্বর আরেকবার দেখে নিন।</string>
     <string name="verify_showing_reports_for_bn">%1$s-এর রিপোর্ট দেখানো হচ্ছে</string>
 
     <!-- Admin booking-details section -->
@@ -763,4 +745,18 @@ Net ₹%3$s · Received ₹%4$s</string>
     <string name="admin_booking_fill_bn">নাম, ১০ সংখ্যার ফোন ও অন্তত একটি টেস্ট দিন।</string>
     <string name="admin_booking_done">Bill %1$s created · ₹%2$s</string>
     <string name="admin_booking_done_bn">%1$s বিল তৈরি হয়েছে · ₹%2$s</string>
+    <string name="verify_name_required">Enter the patient name</string>
+    <string name="verify_name_required_bn">রোগীর নাম লিখুন</string>
+    <string name="verify_phone_required">Enter the full 10-digit mobile number</string>
+    <string name="verify_phone_required_bn">পুরো ১০ সংখ্যার মোবাইল নম্বর দিন</string>
+    <string name="continue_as_guest">Continue as guest</string>
+    <string name="continue_as_guest_bn">অতিথি হিসেবে চালিয়ে যান</string>
+    <string name="guest_name">Guest</string>
+    <string name="guest_name_bn">অতিথি</string>
+    <string name="sign_in">Sign in</string>
+    <string name="sign_in_bn">সাইন ইন</string>
+    <string name="guest_banner_title">You\'re browsing as a guest</string>
+    <string name="guest_banner_title_bn">আপনি অতিথি হিসেবে দেখছেন</string>
+    <string name="guest_banner_message">Sign in to book and pay, or open My Reports to find reports with your name, mobile and bill number.</string>
+    <string name="guest_banner_message_bn">টেস্ট বুক আর বিল মেটাতে সাইন ইন করুন, অথবা "আমার রিপোর্ট"-এ নাম, মোবাইল আর বিল নম্বর দিয়ে রিপোর্ট খুঁজুন।</string>
 </resources>

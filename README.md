@@ -17,11 +17,16 @@ small FastAPI service that connects it to the clinic's AKTIV billing system.
 
 ## App features
 
-- **Login** — Google / Facebook / email via Firebase, or the OTP-free clinic check
-  (any two of patient name, bill number or bill date, phone must match an AKTIV bill;
-  with the phone, the last 3–4 digits of the bill number are enough). A successful check
-  returns a patient token scoped to that phone; the API answers report, bill and payment
-  calls only for the phone a token was issued for.
+- **Login** — Google / Facebook / email via Firebase, or the OTP-free clinic check:
+  patient name, phone and bill number are all required and must match one AKTIV bill.
+  The phone must match in full, the bill number can be just its last 3 or 4 digits, and
+  the name is matched loosely (typos and a missing middle name are fine). There is no
+  bill-date option. A successful check returns a patient token scoped to that phone; the
+  API answers report, bill and payment calls only for the phone a token was issued for.
+- **Guest mode** — "Continue as guest" on the login screen opens the app without an
+  account: home, test catalog, health library and settings work as usual, and My Reports
+  finds reports with the same name + phone + bill check. Booking and payments ask the
+  guest to sign in, since they need a verified phone.
 - **Admin** — the small "Admin? Click here" link under the login form. Staff sign in with
   their AKTIV user id and password; the screen offers what their AKTIV roles allow
   (test counts and bill lookup for everyone; income/CC/due for account rights; new
@@ -119,14 +124,30 @@ schedule from the clinic PC; the tables must already exist in Neon.
 
 © Anubhav Life Care. All rights reserved.
 
+## Release APKs that update in place
+
+A new APK installs over the old one (no uninstall, data kept) only when it is signed with
+the **same release key** and has an equal or higher `versionCode`:
+
+- `versionCode` is set automatically to the UTC build hour (`yyMMddHH`, e.g. `26101604`),
+  so every build is newer than the last. Override with `-PversionCode=N`.
+- CI signs with the release key held in the `ANDROID_KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`,
+  `KEY_ALIAS` and `KEY_PASSWORD` secrets; each build's release notes say `Signing: stable`.
+  Locally, put that key's `keystore.properties` at the repo root (gitignored) and run
+  `./gradlew :app:assembleRelease`.
+- Release key fingerprints: SHA-1 `75:BD:AD:5C:04:67:7B:61:8C:77:9B:60:F0:5C:A5:5F:FA:08:37:14`,
+  SHA-256 `F7:DB:E7:D0:…:CB:79:78:B7`. Google sign-in only works once that SHA-1 is added
+  to the `com.anubhav.app` Android app in the Firebase console and the refreshed
+  `google-services.json` is committed.
+
 ## Login and report fixes: local testing
 
 Build a test APK with `./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug`.
 The installable output is `app/build/outputs/apk/debug/app-debug.apk`. A debug APK uses a
-different signing certificate from the published release, so Android may require removing
-the release app before installing this test build. Removing the app erases its local data.
-Google sign-in requires registering the test certificate in Firebase; clinic verification
-and AKTIV staff login use the API instead.
+different signing certificate from the release key, so Android requires removing the
+release app before installing it (which erases the app's local data); prefer a release
+build for anything a patient will keep. Clinic verification and AKTIV staff login use the
+API instead of Firebase.
 
 The API changes must be deployed separately from the APK. Set `AKTIV_TOKEN_SECRET` to a
 random server-only value distinct from `AKTIV_API_KEY` before starting the updated API.

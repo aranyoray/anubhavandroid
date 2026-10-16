@@ -288,6 +288,18 @@
                         app:cornerRadius="@dimen/button_corner_radius"
                         app:strokeColor="@color/stroke_soft" />
 
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnGuest"
+                        style="@style/Widget.MaterialComponents.Button.TextButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="-8dp"
+                        android:layout_marginBottom="8dp"
+                        android:minHeight="@dimen/touch_target_min"
+                        android:text="@string/continue_as_guest"
+                        android:textAllCaps="false"
+                        android:textColor="@color/brand_dark_blue" />
+
                     <com.google.android.material.textfield.TextInputLayout
                         android:id="@+id/layoutEmail"
                         style="@style/Widget.Anubhav.TextInput"

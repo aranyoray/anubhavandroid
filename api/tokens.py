@@ -3,7 +3,7 @@
 The API key ships inside the APK, so on its own it proves nothing about who is
 calling. Two token kinds close that gap:
 
-* patient token - issued by /api/customer/verify once the 2-of-3 check passes and
+* patient token - issued by /api/customer/verify once name, phone and bill all match and
   scoped to one phone number. Report/bill endpoints only answer for that phone.
   Long-lived, because the app keeps patients signed in and caches their reports.
 * staff token - issued by /api/auth/login against the AKTIV user id + password.

@@ -10,6 +10,8 @@ object CustomerSessionManager {
     private const val KEY_FIREBASE_UID = "firebase_uid"
     private const val KEY_ROLE = "role"
     private const val KEY_COLLECTOR_KEY = "collector_key"
+    private const val GUEST_UID = "guest"
+    private const val ROLE_GUEST = "guest"
 
     fun save(
         context: Context,
@@ -31,6 +33,15 @@ object CustomerSessionManager {
     }
 
     fun isLoggedIn(context: Context): Boolean = !getFirebaseUid(context).isNullOrBlank()
+
+    /**
+     * Guest mode: browse without an account. A guest has no phone, so screens that need one
+     * (bookings, payments) ask for it, and My Reports offers the name + phone + bill lookup.
+     */
+    fun saveGuest(context: Context) =
+        save(context, phone = null, email = null, name = null, firebaseUid = GUEST_UID, role = ROLE_GUEST)
+
+    fun isGuest(context: Context): Boolean = getRole(context) == ROLE_GUEST
 
     fun getPhone(context: Context): String? =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_PHONE, null)

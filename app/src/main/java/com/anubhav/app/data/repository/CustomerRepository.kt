@@ -43,14 +43,13 @@ class CustomerRepository(
      */
     private suspend fun <T> io(block: suspend () -> T): Result<T> =
         withContext(Dispatchers.IO) { apiResult { block() } }
-    /** Guest/patient 2-of-3 fuzzy login. Returns the matched patient + canonical phone. */
+    /** Patient login: name (fuzzy), full phone and bill number (or its last 3-4 digits). */
     suspend fun verify(
         name: String,
         phone: String,
         billNo: String = "",
-        billDate: String? = null,
     ): Result<CustomerVerifyResponse> = apiResult {
-        api.verify(CustomerVerifyRequest(name.trim(), phone.trim(), billNo.trim(), billDate)).also {
+        api.verify(CustomerVerifyRequest(name.trim(), phone.trim(), billNo.trim())).also {
             check(!it.matched || !it.token.isNullOrBlank()) {
                 "The server did not return a verified session. Please contact the clinic to update the API."
             }

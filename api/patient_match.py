@@ -1,13 +1,12 @@
 """
-Fuzzy 2-of-3 patient verification + report view links for the customer portal.
+Patient verification + report view links for the customer portal.
 
-Login (no OTP): patient gives three things and any TWO must match a bill —
-  1. Patient name  (fuzzy: tolerates typos / missing middle name)
-  2. Bill No  OR  Bill Date   (this pair counts as ONE factor)
-  3. Phone number
-Phone is often mistyped, so name is a real fallback: name + (bill no|date) still logs in.
-With the phone, the LAST DIGITS of the bill number are enough (phone + "4171" for
-2026/09/ALC/4171) - that is what patients read off the receipt.
+Login (no OTP): the patient gives three things and ALL THREE must match one bill:
+  1. Phone number  (exact: the full 10-digit mobile on the bill)
+  2. Bill No       (the full ALC number, or just its last 3-4 digits: "4171" or "171"
+                    for 2026/09/ALC/4171 - that is what patients read off the receipt)
+  3. Patient name  (fuzzy: tolerates typos / a missing middle name)
+There is no bill-date option.
 
 Reads LIVE MSSQL first (includes bills made minutes ago); if the clinic database is
 unreachable it answers from the Neon mirror instead, so login and the report list do
@@ -136,55 +135,32 @@ def _bill_month(bill_no: Optional[str]) -> str:
     return ""
 
 
-def _serial_matches(row_serial: str, serial: str, phone_matched: bool) -> bool:
-    """Exact serial, or - only alongside a matching phone - its last digits.
+def _serial_matches(row_serial: str, serial: str) -> bool:
+    """Exact serial (ignoring zero padding), or its last 3+ digits.
 
-    Receipts print the full ALC number but patients type the tail of it. A suffix is
-    accepted only when the phone already matched, so it narrows down that phone's own
-    bills and never widens a name-only search to strangers' bills.
+    Receipts print the full ALC number but patients type the tail of it. The phone
+    has already matched exactly, so a tail only narrows down that phone's own bills.
     """
     if not serial or not row_serial:
         return False
     if row_serial == serial or row_serial.lstrip("0") == serial.lstrip("0"):
         return True
-    return phone_matched and len(serial) >= 3 and serial.isdigit() and row_serial.endswith(serial)
+    return len(serial) >= 3 and serial.isdigit() and row_serial.endswith(serial)
 
 
-def _score_row(
-    r: dict,
-    name: str,
-    phone_n: str,
-    phone_valid: bool,
-    serial: str,
-    bdate: Optional[date],
-    month_prefix: Optional[str],
-) -> int:
-    """2-of-3 factor count for one candidate bill row.
+def _row_matches(r: dict, name: str, phone_n: str, serial: str, month_prefix: Optional[str]) -> bool:
+    """True when this bill matches all three: phone, bill number and name.
 
-    A bill-serial match only counts when it is in the right month: ALC numbering
-    restarts every month, so serial 3 exists in Jan, Feb, … — without pinning the
-    month a serial+name pair could resolve to the wrong patient.
+    A full "YYYY/MM/ALC/NNNN" number also pins the month: ALC numbering restarts
+    every month, so serial 3 exists in Jan, Feb, ... under the same phone.
     """
-    f_phone = 1 if (phone_valid and _norm_phone(r["phone"]) == phone_n) else 0
-    serial_ok = _serial_matches(_bill_serial(r["bill_no"]), serial, bool(f_phone))
-    if serial_ok and month_prefix and _bill_month(r["bill_no"]) != month_prefix:
-        serial_ok = False
-    date_ok = bool(bdate) and r["billdate"] == bdate.strftime("%d/%m/%Y")
-    f_bill = 1 if (serial_ok or date_ok) else 0
-    f_name = 1 if (name and name_score(name, r["patientname"]) >= NAME_MATCH_THRESHOLD) else 0
-    return f_phone + f_bill + f_name
-
-
-def _parse_date(s: Optional[str]) -> Optional[date]:
-    if not s:
-        return None
-    s = str(s).strip()
-    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"):
-        try:
-            return datetime.strptime(s, fmt).date()
-        except ValueError:
-            continue
-    return None
+    if _norm_phone(r["phone"]) != phone_n:
+        return False
+    if not _serial_matches(_bill_serial(r["bill_no"]), serial):
+        return False
+    if month_prefix and _bill_month(r["bill_no"]) != month_prefix:
+        return False
+    return name_score(name, r["patientname"]) >= NAME_MATCH_THRESHOLD
 
 
 def _view_item(name, bill_key, category_key, report_key, bill_no) -> dict:
@@ -215,114 +191,60 @@ def build_collated_view_link(name: str, bill_no, items: list[dict], base: Option
 
 
 # ---------------------------------------------------------------- verification
-NAME_MATCH_THRESHOLD = 0.6
+# Share of the typed name's words that must fuzzily match the bill's name. Phone and bill
+# number already have to match exactly, so the name is a sanity check: half the words is
+# enough ("Priti Sharma" for PRITI SHARMA BANERJEE, "Reena Das" for RINA DAS).
+NAME_MATCH_THRESHOLD = 0.5
 
 
-def _serial_variants(serial: str) -> list[str]:
-    variants = [serial]
-    if serial.isdigit():
-        padded = f"{int(serial):03d}"
-        if padded != serial:
-            variants.append(padded)
-    return variants
-
-
-def _candidates_mssql(phone_n, phone_valid, serial, bdate, month_prefix) -> list[dict]:
-    clauses, params = [], []
-    if phone_valid:
-        clauses.append(f"{mssql_phone10('PHONE')} = %s")
-        params.append(phone_n)
-    if bdate:
-        clauses.append("CAST(BILLDATE AS date) = %s")
-        params.append(bdate)
-    if serial:
-        like_prefix = f"{month_prefix}/%" if month_prefix else "%"
-        ors = []
-        for v in _serial_variants(serial):
-            ors.append("BILL_NO LIKE %s")
-            params.append(f"{like_prefix}/{v}")
-        clauses.append("(" + " OR ".join(ors) + ")")
+def _candidates_mssql(phone_n: str) -> list[dict]:
     sql = (
         "SELECT BILL_KEY AS bill_key, RTRIM(BILL_NO) AS bill_no, RTRIM(ISNULL(PHONE,'')) AS phone, "
         "RTRIM(ISNULL(PATIENTNAME,'')) AS patientname, CONVERT(varchar, BILLDATE, 103) AS billdate "
-        f"FROM BILL_HEAD WHERE {' OR '.join(clauses)} ORDER BY BILL_KEY DESC"
+        f"FROM BILL_HEAD WHERE {mssql_phone10('PHONE')} = %s ORDER BY BILL_KEY DESC"
     )
     with mssql_conn() as conn, conn.cursor() as cur:
-        return fetch_all(cur, sql, tuple(params))
+        return fetch_all(cur, sql, (phone_n,))
 
 
-def _candidates_neon(phone_n, phone_valid, serial, bdate, month_prefix) -> list[dict]:
-    clauses, params = [], []
-    if phone_valid:
-        clauses.append(f"{_PHONE10 % 'phone'} = %s")
-        params.append(phone_n)
-    if bdate:
-        clauses.append("billdate::date = %s")
-        params.append(bdate)
-    if serial:
-        like_prefix = f"{month_prefix}/%" if month_prefix else "%"
-        ors = []
-        for v in _serial_variants(serial):
-            ors.append("rtrim(bill_no) LIKE %s")
-            params.append(f"{like_prefix}/{v}")
-        clauses.append("(" + " OR ".join(ors) + ")")
+def _candidates_neon(phone_n: str) -> list[dict]:
     sql = (
         "SELECT bill_key, rtrim(coalesce(bill_no,'')) AS bill_no, rtrim(coalesce(phone,'')) AS phone, "
         "rtrim(coalesce(patientname,'')) AS patientname, to_char(billdate,'DD/MM/YYYY') AS billdate "
-        f"FROM bill_head WHERE {' OR '.join(clauses)} ORDER BY bill_key DESC"
+        f"FROM bill_head WHERE {_PHONE10 % 'phone'} = %s ORDER BY bill_key DESC"
     )
     with neon_conn() as conn, conn.cursor() as cur:
-        return fetch_all(cur, sql, tuple(params))
+        return fetch_all(cur, sql, (phone_n,))
 
 
-def verify_customer(
-    name: str,
-    phone: str,
-    bill_no: str = "",
-    bill_date: Optional[str] = None,
-) -> dict[str, Any]:
-    """2-of-3 match. Returns the patient's matching bills and the canonical phone
-    (recovered from a matched bill so the rest of the portal can key off phone)."""
+def verify_customer(name: str, phone: str, bill_no: str) -> dict[str, Any]:
+    """All three must match one bill: the full phone, the bill number (or its last
+    3-4 digits) and the patient name (fuzzy). Returns the matching bills and the
+    phone, which the rest of the portal keys off."""
     name = (name or "").strip()
+    bill_no = (bill_no or "").strip()
     phone_n = _norm_phone(phone)
-    phone_valid = bool(phone_n) and not _is_junk_phone(phone_n)
     serial = _bill_serial(bill_no)
-    bdate = _parse_date(bill_date)
-    if bill_no.strip() and (not serial or not serial.isascii() or not serial.isdigit() or len(serial) > 12):
-        raise ValueError("Enter the bill number or its last digits as printed on the receipt")
-    if bill_date and not bdate:
-        raise ValueError("Enter a valid bill date")
-    # The month the ALC serial belongs to: from the bill date, or from a full
-    # "YYYY/MM/ALC/NNNN" number when the patient typed the whole thing.
-    month_prefix = _bill_month(bill_no) or (f"{bdate.year:04d}/{bdate.month:02d}" if bdate else None)
-
-    if not (phone_valid or bdate or serial):
-        return {"matched": False, "reason": "insufficient_input", "patient_name": "", "phone": phone_n, "bills": []}
+    if not name:
+        raise ValueError("Enter the patient name")
+    if len(phone_n) != 10 or _is_junk_phone(phone_n):
+        raise ValueError("Enter the full 10-digit mobile number registered at the clinic")
+    month_prefix = _bill_month(bill_no) or None
+    if (not serial or not serial.isascii() or not serial.isdigit() or len(serial) > 12
+            or (len(serial) < 3 and not month_prefix)):
+        raise ValueError("Enter the bill number or its last 3-4 digits as printed on the receipt")
 
     try:
-        rows = _candidates_mssql(phone_n, phone_valid, serial, bdate, month_prefix)
+        rows = _candidates_mssql(phone_n)
         source = "live"
     except Exception as exc:  # clinic DB down/unreachable - the mirror still knows every bill
         logger.warning("verify: MSSQL unavailable (%s); answering from Neon", exc)
-        rows = _candidates_neon(phone_n, phone_valid, serial, bdate, month_prefix)
+        rows = _candidates_neon(phone_n)
         source = "mirror"
 
-    scored = [(r, _score_row(r, name, phone_n, phone_valid, serial, bdate, month_prefix)) for r in rows]
-    best = max((score for _, score in scored), default=0)
-    candidates = [r for r, score in scored if score >= 2 and score == best]
-    # Never overwrite the identity with each row. Monthly serials and common names
-    # can match several households. Only a unique, strongest phone scope can log in.
-    phones = {_norm_phone(r["phone"]) for r in candidates if not _is_junk_phone(r["phone"])}
-    if candidates and (len(phones) != 1 or any(_is_junk_phone(r["phone"]) for r in candidates)):
-        return {
-            "matched": False,
-            "reason": "ambiguous_match" if len(phones) > 1 else "missing_record_phone",
-            "patient_name": "", "phone": "", "bills": [], "source": source,
-        }
-    canonical_phone = next(iter(phones), "")
     matched, seen = [], set()
-    for r in candidates:
-        if r["bill_key"] not in seen:
+    for r in rows:
+        if r["bill_key"] not in seen and _row_matches(r, name, phone_n, serial, month_prefix):
             seen.add(r["bill_key"])
             matched.append({
                 "bill_key": r["bill_key"],
@@ -334,7 +256,7 @@ def verify_customer(
     return {
         "matched": bool(matched),
         "patient_name": matched[0]["patient_name"] if matched else "",
-        "phone": canonical_phone,
+        "phone": phone_n if matched else "",
         "bills": matched,
         "source": source,
     }

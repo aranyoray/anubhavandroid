@@ -1,3 +1,6 @@
+import java.time.ZoneOffset
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 import java.util.Properties
 
 plugins {
@@ -28,6 +31,13 @@ fun appConfig(name: String, defaultValue: String = ""): String =
         .orElse(localConfig.getProperty(name) ?: defaultValue)
         .get()
 
+// Each build gets a higher versionCode (UTC yyMMddHH, e.g. 26101604) so a new APK
+// installs over the previous one as an update instead of needing an uninstall. That
+// also requires every APK to be signed with the same release key (keystore.properties
+// locally, the ANDROID_KEYSTORE_BASE64 secret in CI). Override with -PversionCode=N.
+val buildVersionCode = appConfig("versionCode").toIntOrNull()
+    ?: ZonedDateTime.now(ZoneOffset.UTC).format(DateTimeFormatter.ofPattern("yyMMddHH")).toInt()
+
 fun quoted(value: String): String =
     "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
 
@@ -39,8 +49,8 @@ android {
         applicationId = "com.anubhav.app"
         minSdk = 24
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.0"
+        versionCode = buildVersionCode
+        versionName = "1.0 ($buildVersionCode)"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Public API via the Cloudflare tunnel. Override with -PAKTIV_API_URL=... or

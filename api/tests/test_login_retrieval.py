@@ -17,48 +17,32 @@ def row(key=1, phone=PHONE, name='RINA DAS', bill='2026/09/ALC/4171'):
 
 
 class VerifyIdentityTests(unittest.TestCase):
-    def verify(self, rows, name='RINA DAS', phone=PHONE, bill='4171', bill_date=None):
+    def verify(self, rows, name='RINA DAS', phone=PHONE, bill='4171'):
         with patch.object(pm, '_candidates_mssql', return_value=rows):
-            return pm.verify_customer(name, phone, bill, bill_date)
+            return pm.verify_customer(name, phone, bill)
 
-    def test_three_factors_win_over_another_patients_two(self):
+    def test_all_three_match_logs_in_to_that_phone_only(self):
         result = self.verify([row(), row(2, OTHER)])
         self.assertTrue(result['matched'])
         self.assertEqual(result['phone'], PHONE)
         self.assertEqual([b['bill_key'] for b in result['bills']], [1])
 
-    def test_ambiguous_name_and_bill_does_not_pick_last_phone(self):
-        result = self.verify([row(), row(2, OTHER)], phone='')
-        self.assertFalse(result['matched'])
-        self.assertEqual(result['reason'], 'ambiguous_match')
-        self.assertEqual(result['bills'], [])
-
-    def test_missing_record_phone_does_not_authorise_unmatched_input_phone(self):
-        result = self.verify([row(phone='')], phone=OTHER)
-        self.assertFalse(result['matched'])
-        self.assertEqual(result['reason'], 'missing_record_phone')
-
-    def test_unique_name_bill_recovers_mistyped_phone(self):
+    def test_mistyped_phone_does_not_log_in(self):
         result = self.verify([row()], phone=OTHER)
-        self.assertTrue(result['matched'])
-        self.assertEqual(result['phone'], PHONE)
+        self.assertFalse(result['matched'])
+        self.assertEqual(result['phone'], '')
 
-    def test_full_bill_month_wins_over_conflicting_optional_date(self):
-        result = self.verify([row()], name='', bill='2026/09/ALC/4171', bill_date='2026-08-24')
-        self.assertTrue(result['matched'])
+    def test_bill_from_another_month_with_same_tail_also_listed_for_that_phone(self):
+        result = self.verify([row(), row(2, bill='2026/08/ALC/4171')])
+        self.assertEqual([b['bill_key'] for b in result['bills']], [1, 2])
 
-    def test_multiple_bills_for_one_phone_are_not_ambiguous(self):
-        result = self.verify([row(), row(2)], phone='')
-        self.assertTrue(result['matched'])
-        self.assertEqual(result['phone'], PHONE)
-
-    def test_non_ascii_name_is_a_valid_name_factor(self):
-        result = self.verify([row(name='রিনা দাস')], name='রিনা দাস', bill='')
+    def test_non_ascii_name_is_matched(self):
+        result = self.verify([row(name='রিনা দাস')], name='রিনা দাস')
         self.assertTrue(result['matched'])
 
     def test_wildcards_are_not_bill_numbers(self):
         with self.assertRaises(ValueError):
-            self.verify([], phone='', bill='%')
+            self.verify([], bill='%')
 
 
 class CandidateQueryTests(unittest.TestCase):
@@ -66,7 +50,7 @@ class CandidateQueryTests(unittest.TestCase):
         for backend, connection in ((pm._candidates_mssql, 'mssql_conn'), (pm._candidates_neon, 'neon_conn')):
             with self.subTest(backend=backend.__name__), patch.object(pm, connection, return_value=MagicMock()), \
                     patch.object(pm, 'fetch_all', return_value=[]) as fetch:
-                backend(PHONE, True, '4171', None, None)
+                backend(PHONE)
                 sql = fetch.call_args.args[1].upper()
                 self.assertNotIn('TOP 500', sql)
                 self.assertNotIn('LIMIT 500', sql)

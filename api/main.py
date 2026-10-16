@@ -112,7 +112,7 @@ STAFF_TOKEN = Header("", alias="X-Staff-Token")
 def require_patient(token: str, phone: str) -> str:
     """The phone this request may read, or 401/403.
 
-    /api/customer/verify is where the 2-of-3 check happens; it hands back a token
+    /api/customer/verify is where the name + phone + bill check happens; it hands back a token
     scoped to the matched phone. Without this check the verify step was decoration:
     any caller holding the (APK-embedded) API key could list anyone's reports by phone.
     """
@@ -388,20 +388,19 @@ class CollectorPatientRequest(BaseModel):
 
 
 class CustomerVerifyRequest(BaseModel):
-    """Guest/patient login: 2 of 3 must match — name, (bill_no OR bill_date), phone."""
+    """Guest/patient login: name, phone and bill number must all match one bill.
+    Older app builds also send bill_date; it is ignored."""
     name: str = ""
     phone: str = ""
     bill_no: str = ""
-    bill_date: Optional[str] = None
 
 
 @app.post("/api/customer/verify")
 def api_customer_verify(body: CustomerVerifyRequest):
-    provided = sum(bool(x) for x in (body.name.strip(), (body.bill_no.strip() or body.bill_date), body.phone.strip()))
-    if provided < 2:
-        raise HTTPException(status_code=400, detail="Provide at least two of: name, bill no/date, phone")
+    if not (body.name.strip() and body.phone.strip() and body.bill_no.strip()):
+        raise HTTPException(status_code=400, detail="Enter the patient name, phone number and bill number")
     try:
-        result = verify_customer(body.name, body.phone, body.bill_no, body.bill_date)
+        result = verify_customer(body.name, body.phone, body.bill_no)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:

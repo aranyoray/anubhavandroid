@@ -53,46 +53,53 @@ class TokenTests(_Env):
 
 
 class BillTailTests(unittest.TestCase):
-    def score(self, row, name="", phone=PHONE, serial="", bdate=None, month=None):
-        pn = patient_match._norm_phone(phone)
-        return patient_match._score_row(row, name, pn, bool(pn), serial, bdate, month)
+    def matches(self, row, name="RINA DAS", phone=PHONE, serial="", month=None):
+        return patient_match._row_matches(row, name, patient_match._norm_phone(phone), serial, month)
 
-    def test_phone_plus_last_digits_logs_in(self):
-        self.assertEqual(self.score(_row("2026/09/ALC/4171"), serial="171"), 2)
-        self.assertEqual(self.score(_row("2026/09/ALC/4171"), serial="4171"), 2)
+    def test_name_phone_and_last_digits_log_in(self):
+        self.assertTrue(self.matches(_row("2026/09/ALC/4171"), serial="171"))
+        self.assertTrue(self.matches(_row("2026/09/ALC/4171"), serial="4171"))
 
-    def test_tail_alone_never_matches_a_strangers_bill(self):
-        # name + tail must not count: the tail only narrows the phone's own bills
+    def test_tail_never_matches_a_strangers_bill(self):
+        # the tail only narrows the phone's own bills
         row = _row("2026/09/ALC/4171", phone="9000000000")
-        self.assertEqual(self.score(row, name="RINA DAS", serial="171"), 1)
+        self.assertFalse(self.matches(row, serial="171"))
 
     def test_two_digit_tail_is_too_loose(self):
-        self.assertEqual(self.score(_row("2026/09/ALC/4171"), serial="71"), 1)
+        self.assertFalse(self.matches(_row("2026/09/ALC/4171"), serial="71"))
 
     def test_full_bill_number_pins_the_month(self):
         pm = patient_match._bill_month("2026/08/ALC/4171")
-        self.assertEqual(self.score(_row("2026/09/ALC/4171"), serial="4171", month=pm), 1)
+        self.assertFalse(self.matches(_row("2026/09/ALC/4171"), serial="4171", month=pm))
 
 
 class VerifyFallbackTests(_Env):
     def test_mirror_answers_when_clinic_db_is_down(self):
         with patch.object(patient_match, "_candidates_mssql", side_effect=OSError("down")), \
                 patch.object(patient_match, "_candidates_neon", return_value=[_row("2026/09/ALC/4171")]):
-            out = patient_match.verify_customer("", PHONE, "4171")
+            out = patient_match.verify_customer("Rina Das", PHONE, "4171")
         self.assertTrue(out["matched"])
         self.assertEqual(out["source"], "mirror")
 
     def test_verify_endpoint_issues_scoped_token(self):
         with patch.object(main, "verify_customer",
                           return_value={"matched": True, "phone": PHONE, "patient_name": "X", "bills": []}):
-            r = self.client.post("/api/customer/verify", json={"phone": PHONE, "bill_no": "4171"})
+            r = self.client.post("/api/customer/verify", json={"name": "Rina Das", "phone": PHONE, "bill_no": "4171"})
         self.assertEqual(tokens.patient_phones(r.json()["token"]), {PHONE})
 
     def test_no_token_when_no_match(self):
         with patch.object(main, "verify_customer",
                           return_value={"matched": False, "phone": PHONE, "patient_name": "", "bills": []}):
-            r = self.client.post("/api/customer/verify", json={"phone": PHONE, "bill_no": "1"})
+            r = self.client.post("/api/customer/verify", json={"name": "Rina Das", "phone": PHONE, "bill_no": "1"})
         self.assertNotIn("token", r.json())
+
+    def test_verify_endpoint_requires_all_three_fields(self):
+        full = {"name": "Rina Das", "phone": PHONE, "bill_no": "4171"}
+        for missing in full:
+            with self.subTest(missing=missing), patch.object(main, "verify_customer") as verify:
+                r = self.client.post("/api/customer/verify", json={**full, missing: ""})
+            self.assertEqual(r.status_code, 400)
+            verify.assert_not_called()
 
 
 class HistoryMergeTests(unittest.TestCase):
