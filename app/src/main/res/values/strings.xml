@@ -232,10 +232,10 @@
     <string name="booking_patient_details">Patient details</string>
     <string name="booking_schedule">Date and time</string>
     <string name="booking_choose_tests">Choose tests</string>
-    <string name="prebook_policy">50%% advance is non-refundable. Reschedule only by calling %1$s.</string>
+    <string name="prebook_policy">Reschedule anytime by calling %1$s.</string>
     <string name="no_tests_selected">No tests selected — search and tap tests above</string>
     <string name="total_amount_value">Total: ₹%1$.0f</string>
-    <string name="advance_amount_value">50%% advance (non-refundable): ₹%1$.0f</string>
+    <string name="advance_amount_value">50%% advance: ₹%1$.0f</string>
     <string name="prebook_success">Booked! ALC %1$s. To reschedule call %2$s.</string>
     <string name="phone_required_title">Mobile number needed</string>
     <string name="phone_required">Your account is not linked to a mobile number yet. Bookings and bills use your registered phone at the clinic. Please call or WhatsApp us to link your number.</string>
@@ -316,7 +316,7 @@
 <string name="bill_register_summary">%1$d bills · Rs %2$.0f paid · Rs %3$.0f pending</string>
 <string name="appointment_value">Appointment %1$s · %2$s</string>
     <string name="reschedule_phone">9230755876</string>
-    <string name="payment_description_prebook" formatted="false">50% prebook advance (non-refundable)</string>
+    <string name="payment_description_prebook" formatted="false">50% prebook advance</string>
     <string name="payment_description_pending">Pending bill %1$s</string>
     <string name="complete_profile_banner">Add your clinic-registered mobile number to book tests and pay bills online.</string>
     <string name="login_welcome">Welcome back</string>
@@ -535,10 +535,10 @@
     <string name="booking_patient_details_bn">রোগীর তথ্য</string>
     <string name="booking_schedule_bn">তারিখ ও সময়</string>
     <string name="booking_choose_tests_bn">টেস্ট বেছে নিন</string>
-    <string name="prebook_policy_bn">৫০%% অ্যাডভান্স ফেরত হয় না। দিন বদলাতে হলে শুধু %1$s নম্বরে ফোন করুন।</string>
+    <string name="prebook_policy_bn">দিন বদলাতে হলে %1$s নম্বরে ফোন করুন।</string>
     <string name="no_tests_selected_bn">এখনও কোনো টেস্ট বাছা হয়নি — উপরে খুঁজে টেস্টে ট্যাপ করুন</string>
     <string name="total_amount_value_bn">মোট: ₹%1$.0f</string>
-    <string name="advance_amount_value_bn">৫০%% অ্যাডভান্স (ফেরত হয় না): ₹%1$.0f</string>
+    <string name="advance_amount_value_bn">৫০%% অ্যাডভান্স: ₹%1$.0f</string>
     <string name="prebook_success_bn">বুকিং হয়ে গেছে! ALC %1$s। দিন বদলাতে হলে %2$s নম্বরে ফোন করুন।</string>
     <string name="phone_required_title_bn">মোবাইল নম্বর দরকার</string>
     <string name="phone_required_bn">আপনার অ্যাকাউন্টের সঙ্গে এখনও মোবাইল নম্বর যুক্ত হয়নি। বুকিং আর বিলের জন্য ক্লিনিকে রেজিস্টার করা নম্বরটাই লাগে। ফোন বা হোয়াটসঅ্যাপ করে নম্বরটি যুক্ত করিয়ে নিন।</string>

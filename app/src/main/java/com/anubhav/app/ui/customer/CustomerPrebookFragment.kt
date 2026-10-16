@@ -117,7 +117,7 @@ class CustomerPrebookFragment : Fragment(), PaymentResultListener {
         (activity as? MainActivity)?.setPaymentListener(this)
         val etName = view.findViewById<TextInputEditText>(R.id.etPatientName)
         val etAge = view.findViewById<TextInputEditText>(R.id.etAgeYear)
-        val spinnerSex = view.findViewById<AutoCompleteTextView>(R.id.spinnerSex)
+        val sexToggle = view.findViewById<com.google.android.material.button.MaterialButtonToggleGroup>(R.id.sexToggle)
         val btnDate = view.findViewById<MaterialButton>(R.id.btnDate)
         val spinnerSlot = view.findViewById<AutoCompleteTextView>(R.id.spinnerSlot)
         val btnUseLocation = view.findViewById<MaterialButton>(R.id.btnUseLocation)
@@ -143,21 +143,14 @@ class CustomerPrebookFragment : Fragment(), PaymentResultListener {
         btnPay.text = localized(R.string.pay_advance)
         restoreState(savedInstanceState)
 
-        // The dropdown shows localized labels, but AKTIV only understands MALE/FEMALE —
-        // sending the Bengali label silently registered every patient as MALE.
-        val sexLabels = listOf(localized(R.string.sex_male), localized(R.string.sex_female))
-        spinnerSex.setAdapter(
-            ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, sexLabels),
-        )
-        spinnerSex.setText(sexLabels[if (selectedSex == SEX_FEMALE) 1 else 0], false)
-        spinnerSex.setOnItemClickListener { parent, _, position, _ ->
-            val label = parent.getItemAtPosition(position) as? String
-            selectedSex = if (label == sexLabels[1]) SEX_FEMALE else SEX_MALE
+        // Sleek segmented M/F selector; AKTIV only understands MALE/FEMALE.
+        sexToggle.check(if (selectedSex == SEX_FEMALE) R.id.sexFemale else R.id.sexMale)
+        sexToggle.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (isChecked) selectedSex = if (checkedId == R.id.sexFemale) SEX_FEMALE else SEX_MALE
         }
 
-        // These fields are read-only pickers (inputType="none"); make a single tap
+        // The slot field is a read-only picker (inputType="none"); make a single tap
         // reliably open the dropdown instead of just focusing the field.
-        spinnerSex.setOnClickListener { spinnerSex.showDropDown() }
         spinnerSlot.setOnClickListener { spinnerSlot.showDropDown() }
 
         btnUseLocation.text = localized(R.string.use_my_location)
