@@ -193,8 +193,7 @@ class MyReportsFragment : Fragment() {
             apiResult { ReportFetcher.download(requireContext(), v.billKey, reportPhone, link) }
                 .onSuccess { file ->
                     btn.isEnabled = true; btn.text = original
-                    runCatching { ReportFetcher.open(requireContext(), file) }
-                        .onFailure { Toast.makeText(requireContext(), localized(R.string.reports_no_pdf_viewer), Toast.LENGTH_LONG).show() }
+                    showExportSheet(v, file)
                 }
                 .onFailure { err ->
                     btn.isEnabled = true; btn.text = original
@@ -206,6 +205,61 @@ class MyReportsFragment : Fragment() {
                     }
                 }
         }
+    }
+
+    /** Export chooser: the report opens on demand, and PDF download is one option, not the default. */
+    private fun showExportSheet(v: CustomerVisit, file: java.io.File) {
+        val ctx = requireContext()
+        val displayName = "Anubhav-Report-${(v.billNo ?: v.billKey.toString()).filter { it.isLetterOrDigit() }}"
+        val shareMessage = "Anubhav Life Care report ${v.billNo.orEmpty()} ${v.tests.orEmpty()}".trim()
+
+        val content = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(16), dp(20), dp(20))
+        }
+        content.addView(TextView(ctx).apply {
+            text = localized(R.string.report_export_title)
+            setTypeface(typeface, Typeface.BOLD); textSize = 17f
+            setPadding(0, 0, 0, dp(4))
+        })
+        content.addView(TextView(ctx).apply {
+            text = listOfNotNull(v.billNo?.let { "ALC $it" }, v.tests?.takeIf { it.isNotBlank() })
+                .joinToString(" · ")
+            setTextColor(0xFF667085.toInt()); textSize = 13f
+            setPadding(0, 0, 0, dp(10))
+        })
+
+        val sheet = com.google.android.material.bottomsheet.BottomSheetDialog(ctx)
+
+        fun option(labelRes: Int, action: () -> Unit) {
+            content.addView(Button(ctx).apply {
+                text = localized(labelRes); isAllCaps = false; textSize = 15f
+                gravity = Gravity.START or Gravity.CENTER_VERTICAL
+                layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(8) }
+                setOnClickListener { sheet.dismiss(); action() }
+            })
+        }
+
+        option(R.string.report_open) {
+            runCatching { ReportFetcher.open(ctx, file) }
+                .onFailure { Toast.makeText(ctx, localized(R.string.reports_no_pdf_viewer), Toast.LENGTH_LONG).show() }
+        }
+        option(R.string.report_share_whatsapp) {
+            if (!ReportFetcher.share(ctx, file, shareMessage)) {
+                Toast.makeText(ctx, localized(R.string.report_share_failed), Toast.LENGTH_LONG).show()
+            }
+        }
+        option(R.string.report_save_file) {
+            val ok = ReportFetcher.saveToDownloads(ctx, file, displayName)
+            Toast.makeText(
+                ctx,
+                localized(if (ok) R.string.report_saved_to_downloads else R.string.report_save_failed),
+                Toast.LENGTH_LONG,
+            ).show()
+        }
+
+        sheet.setContentView(content)
+        sheet.show()
     }
 
     /** With no verified phone yet (guest, Google/email sign-in) the lookup finds their OWN reports. */

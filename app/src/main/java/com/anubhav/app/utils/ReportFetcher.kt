@@ -106,4 +106,55 @@ object ReportFetcher {
         }
         context.startActivity(intent)
     }
+
+    private fun uriFor(context: Context, file: File) =
+        FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+
+    /** Share the real downloaded report PDF, preferring WhatsApp, else the system chooser. */
+    fun share(context: Context, file: File, message: String): Boolean {
+        val uri = runCatching { uriFor(context, file) }.getOrNull() ?: return false
+        val base = Intent(Intent.ACTION_SEND).apply {
+            type = "application/pdf"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_TEXT, message)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        val toWhatsApp = listOf("com.whatsapp", "com.whatsapp.w4b").any { pkg ->
+            runCatching { context.startActivity(Intent(base).setPackage(pkg)) }.isSuccess
+        }
+        if (toWhatsApp) return true
+        return runCatching {
+            context.startActivity(
+                Intent.createChooser(base, "Share report").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        }.isSuccess
+    }
+
+    /** Copy the report PDF into the public Downloads folder so it persists outside the app. */
+    fun saveToDownloads(context: Context, file: File, displayName: String): Boolean = runCatching {
+        val name = if (displayName.endsWith(".pdf", true)) displayName else "$displayName.pdf"
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            val values = android.content.ContentValues().apply {
+                put(android.provider.MediaStore.Downloads.DISPLAY_NAME, name)
+                put(android.provider.MediaStore.Downloads.MIME_TYPE, "application/pdf")
+                put(android.provider.MediaStore.Downloads.IS_PENDING, 1)
+            }
+            val resolver = context.contentResolver
+            val uri = resolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                ?: return false
+            resolver.openOutputStream(uri)?.use { out -> file.inputStream().use { it.copyTo(out) } }
+            values.clear()
+            values.put(android.provider.MediaStore.Downloads.IS_PENDING, 0)
+            resolver.update(uri, values, null, null)
+            true
+        } else {
+            @Suppress("DEPRECATION")
+            val dir = android.os.Environment.getExternalStoragePublicDirectory(
+                android.os.Environment.DIRECTORY_DOWNLOADS,
+            )
+            if (!dir.exists()) dir.mkdirs()
+            file.copyTo(File(dir, name), overwrite = true)
+            true
+        }
+    }.getOrDefault(false)
 }

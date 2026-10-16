@@ -176,6 +176,13 @@
     <string name="signing_you_in">Signing you in…</string>
     <string name="verifying_ellipsis">Verifying your details…</string>
     <string name="age_invalid">Enter a valid age between 0 and 120</string>
+    <string name="report_export_title">Report ready</string>
+    <string name="report_open">Open report</string>
+    <string name="report_share_whatsapp">Share to WhatsApp</string>
+    <string name="report_save_file">Save PDF to device</string>
+    <string name="report_saved_to_downloads">Saved to your Downloads folder</string>
+    <string name="report_save_failed">Could not save the PDF</string>
+    <string name="report_share_failed">No app available to share the PDF</string>
     <string name="error">Error</string>
     <string name="success">Success</string>
     <string name="retry">Retry</string>
@@ -765,4 +772,11 @@ Net ₹%3$s · Received ₹%4$s</string>
     <string name="signing_you_in_bn">সাইন ইন করা হচ্ছে…</string>
     <string name="verifying_ellipsis_bn">আপনার তথ্য যাচাই করা হচ্ছে…</string>
     <string name="age_invalid_bn">০ থেকে ১২০-র মধ্যে একটি সঠিক বয়স লিখুন</string>
+    <string name="report_export_title_bn">রিপোর্ট তৈরি</string>
+    <string name="report_open_bn">রিপোর্ট খুলুন</string>
+    <string name="report_share_whatsapp_bn">হোয়াটসঅ্যাপে পাঠান</string>
+    <string name="report_save_file_bn">পিডিএফ ডিভাইসে সেভ করুন</string>
+    <string name="report_saved_to_downloads_bn">আপনার ডাউনলোড ফোল্ডারে সেভ হয়েছে</string>
+    <string name="report_save_failed_bn">পিডিএফ সেভ করা গেল না</string>
+    <string name="report_share_failed_bn">পিডিএফ শেয়ার করার কোনো অ্যাপ নেই</string>
 </resources>
