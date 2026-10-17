@@ -808,8 +808,8 @@ Net ₹%3$s · Received ₹%4$s</string>
     <string name="sign_in_bn">সাইন ইন</string>
     <string name="guest_banner_title">You\'re browsing as a guest</string>
     <string name="guest_banner_title_bn">আপনি অতিথি হিসেবে দেখছেন</string>
-    <string name="guest_banner_message">Sign in to book and pay, or open My Reports to find reports with your name, mobile and bill number.</string>
-    <string name="guest_banner_message_bn">টেস্ট বুক আর বিল মেটাতে সাইন ইন করুন, অথবা "আমার রিপোর্ট"-এ নাম, মোবাইল আর বিল নম্বর দিয়ে রিপোর্ট খুঁজুন।</string>
+    <string name="guest_banner_message">Sign in to book and pay, or open My Reports to find reports with your name, bill date and bill number.</string>
+    <string name="guest_banner_message_bn">টেস্ট বুক আর বিল মেটাতে সাইন ইন করুন, অথবা "আমার রিপোর্ট"-এ নাম, বিলের তারিখ আর বিল নম্বর দিয়ে রিপোর্ট খুঁজুন।</string>
     <string name="signing_you_in_bn">সাইন ইন করা হচ্ছে…</string>
     <string name="verifying_ellipsis_bn">আপনার তথ্য যাচাই করা হচ্ছে…</string>
     <string name="age_invalid_bn">০ থেকে ১২০-র মধ্যে একটি সঠিক বয়স লিখুন</string>
