@@ -197,7 +197,9 @@ jobs:
 
       - name: Upload AAB to Google Play
         if: steps.play.outputs.publish == 'true'
-        uses: r0adkll/upload-google-play@v1
+        # Pinned to a commit, not the moving @v1 tag: this step is handed the Play
+        # release credentials, so the code behind it should not change under us.
+        uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: com.anubhav.app
