@@ -20,12 +20,25 @@ name: Build APK
 # Optional build inputs (repository secrets or variables), all with safe defaults:
 #   RAZORPAY_KEY_ID  - baked into BuildConfig; empty is fine for a non-payment build.
 #   AKTIV_API_URL    - defaults to https://api.anubhavlifecare.in/ (the Cloudflare tunnel).
+#
+# PLAY STORE. Tagging v* (or running this manually with a track chosen) also builds an AAB and
+# uploads it to Google Play, which needs the PLAY_SERVICE_ACCOUNT_JSON secret - the JSON key of
+# a Google Cloud service account that has been invited into the Play Console with "Release to
+# testing tracks" rights. Without that secret the upload is skipped and the APK build is
+# unaffected. Tags publish to the internal track only; promoting to production is a deliberate
+# click in the Play Console, or a manual run of this workflow with production selected.
 
 on:
   push:
     branches: ["**"]
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      play_track:
+        description: "Publish the AAB to this Play track (leave as none to only build)"
+        type: choice
+        default: none
+        options: [none, internal, alpha, beta, production]
 
 permissions:
   contents: write
@@ -144,6 +157,53 @@ jobs:
             | while read -r name; do
                 [ -n "$name" ] && gh release delete-asset apk-latest "$name" --yes || true
               done
+
+      # ---------------------------------------------------------------- Google Play
+      # Play only accepts an AAB, and only one signed with the real upload key - an
+      # ephemeral CI key would be rejected as a different app, so stop before building.
+      - name: Decide whether to publish to Play
+        id: play
+        env:
+          HAS_KEY: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON != '' }}
+        run: |
+          set -euo pipefail
+          track="${{ github.event.inputs.play_track || 'none' }}"
+          if [ "${{ startsWith(github.ref, 'refs/tags/') }}" = "true" ] && [ "$track" = "none" ]; then
+            track="internal"   # a tag publishes for testing, never straight to production
+          fi
+          if [ "$track" = "none" ]; then
+            echo "Not a tag and no track chosen - skipping Play upload."
+            echo "publish=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if [ "${HAS_KEY}" != "true" ]; then
+            echo "::warning::PLAY_SERVICE_ACCOUNT_JSON is not set - skipping the Play upload."
+            echo "publish=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if [ "${{ steps.sign.outputs.mode }}" != "stable" ]; then
+            echo "::error::Refusing to publish: this run used an ephemeral signing key, which Play will reject. Set ANDROID_KEYSTORE_BASE64."
+            exit 1
+          fi
+          echo "track=$track" >> "$GITHUB_OUTPUT"
+          echo "publish=true" >> "$GITHUB_OUTPUT"
+
+      - name: Build release AAB
+        if: steps.play.outputs.publish == 'true'
+        env:
+          RAZORPAY_KEY_ID: ${{ secrets.RAZORPAY_KEY_ID }}
+          AKTIV_API_URL: ${{ vars.AKTIV_API_URL }}
+          AKTIV_API_KEY: ${{ secrets.AKTIV_API_KEY }}
+          AKTIV_API_KEY_HEADER: ${{ vars.AKTIV_API_KEY_HEADER }}
+        run: ./gradlew --no-daemon bundleRelease
+
+      - name: Upload AAB to Google Play
+        if: steps.play.outputs.publish == 'true'
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.anubhav.app
+          releaseFiles: app/build/outputs/bundle/release/app-release.aab
+          track: ${{ steps.play.outputs.track }}
+          status: completed
 
       - name: Publish APK to a GitHub Release
         if: >

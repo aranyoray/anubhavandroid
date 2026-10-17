@@ -38,6 +38,11 @@ fun appConfig(name: String, defaultValue: String = ""): String =
 val buildVersionCode = appConfig("versionCode").toIntOrNull()
     ?: ZonedDateTime.now(ZoneOffset.UTC).format(DateTimeFormatter.ofPattern("yyMMddHH")).toInt()
 
+// What patients see on the Play listing and in Settings. The versionCode above is a
+// build timestamp and is meaningless to them, so it is kept out of this. Bump by hand
+// for a release; Play orders updates by versionCode, not by this string.
+val buildVersionName = appConfig("versionName", "1.1.0")
+
 fun quoted(value: String): String =
     "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
 
@@ -50,7 +55,7 @@ android {
         minSdk = 24
         targetSdk = 36
         versionCode = buildVersionCode
-        versionName = "1.0 ($buildVersionCode)"
+        versionName = buildVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Public API via the Cloudflare tunnel. Override with -PAKTIV_API_URL=... or

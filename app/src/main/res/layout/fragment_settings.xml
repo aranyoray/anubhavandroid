@@ -206,5 +206,40 @@
             android:ellipsize="end"
             app:cornerRadius="@dimen/button_corner_radius"
             app:strokeColor="@color/stroke_soft" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnPrivacyPolicy"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="@string/settings_privacy_policy"
+            android:textColor="@color/brand_dark_blue"
+            android:maxLines="1"
+            android:ellipsize="end"
+            app:cornerRadius="@dimen/button_corner_radius"
+            app:strokeColor="@color/stroke_soft" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnDeleteAccount"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="@string/settings_delete_account"
+            android:textColor="@color/status_error"
+            android:maxLines="1"
+            android:ellipsize="end"
+            app:cornerRadius="@dimen/button_corner_radius"
+            app:strokeColor="@color/status_error" />
+
+        <TextView
+            android:id="@+id/tvAppVersion"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:gravity="center"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp" />
     </LinearLayout>
 </ScrollView>

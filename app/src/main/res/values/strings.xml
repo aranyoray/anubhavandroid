@@ -85,6 +85,17 @@
     <string name="sync_app_data">Sync app data</string>
     <string name="sync_app_data_done">App data synced for offline use</string>
 
+    <!-- Settings: privacy + account deletion (required by Google Play policy) -->
+    <string name="settings_privacy_policy">Privacy policy</string>
+    <string name="privacy_policy_url" translatable="false">https://www.anubhavlifecare.in/privacy-policy</string>
+    <string name="settings_delete_account">Delete my account</string>
+    <string name="delete_account_title">Delete your account?</string>
+    <string name="delete_account_message">This removes your sign-in and everything this app keeps on this phone — saved reports, bookings and your verified session.\n\nYour medical records and bills stay with the clinic: we are required to keep them. To have those removed too, contact the clinic on %1$s.</string>
+    <string name="delete_account_confirm">Delete account</string>
+    <string name="delete_account_done">Your account has been deleted.</string>
+    <string name="delete_account_failed">Could not delete the account. Please sign in again and retry.</string>
+    <string name="app_version">Version %1$s</string>
+
     <!-- Booking -->
     <string name="book_appointment">Book Appointment</string>
     <string name="select_tests">Select Tests</string>
@@ -446,6 +457,14 @@
     <string name="collector_key_required_bn">সঠিক কালেক্টর কী দিন</string>
     <string name="collector_no_access_bn">এই স্ক্রিন ব্যবহার করতে হলে আগে সেটিংসে কালেক্টর কী সেভ করুন।</string>
     <string name="sync_app_data_bn">অ্যাপ ডাটা সিঙ্ক করুন</string>
+    <string name="settings_privacy_policy_bn">গোপনীয়তা নীতি</string>
+    <string name="settings_delete_account_bn">আমার অ্যাকাউন্ট মুছুন</string>
+    <string name="delete_account_title_bn">অ্যাকাউন্ট মুছে ফেলবেন?</string>
+    <string name="delete_account_message_bn">এতে আপনার সাইন-ইন আর এই ফোনে রাখা সব কিছু — সেভ করা রিপোর্ট, বুকিং আর যাচাই করা সেশন — মুছে যাবে।\n\nআপনার মেডিকেল রেকর্ড আর বিল ক্লিনিকেই থাকবে: আইন অনুযায়ী সেগুলো রাখতে হয়। সেগুলোও মোছাতে চাইলে %1$s নম্বরে ক্লিনিকে যোগাযোগ করুন।</string>
+    <string name="delete_account_confirm_bn">অ্যাকাউন্ট মুছুন</string>
+    <string name="delete_account_done_bn">আপনার অ্যাকাউন্ট মুছে ফেলা হয়েছে।</string>
+    <string name="delete_account_failed_bn">অ্যাকাউন্ট মোছা গেল না। আবার সাইন ইন করে চেষ্টা করুন।</string>
+    <string name="app_version_bn">ভার্সন %1$s</string>
     <string name="sync_app_data_done_bn">অফলাইনে ব্যবহারের জন্য ডাটা সিঙ্ক হয়েছে</string>
 
     <string name="book_appointment_bn">অ্যাপয়েন্টমেন্ট বুক করুন</string>

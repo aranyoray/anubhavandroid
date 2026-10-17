@@ -10,9 +10,14 @@ import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import com.anubhav.app.BuildConfig
 import com.anubhav.app.R
+import com.anubhav.app.ui.login.LoginActivity
+import com.anubhav.app.utils.ReportCache
+import com.google.firebase.auth.FirebaseAuth
 import com.anubhav.app.data.repository.AktivRepository
 import com.anubhav.app.data.repository.CatalogRepository
 import com.anubhav.app.data.repository.CustomerRepository
@@ -45,6 +50,9 @@ class SettingsFragment : Fragment() {
         setupClinicPhoneLink(view)
         setupCollectorKey(view)
         setupDataSync(view)
+        setupPrivacyPolicy(view)
+        setupDeleteAccount(view)
+        showAppVersion(view)
     }
 
     private fun applyLocalizedLabels(view: View) {
@@ -225,5 +233,74 @@ class SettingsFragment : Fragment() {
                 Toast.makeText(requireContext(), localized(R.string.whatsapp_not_available), Toast.LENGTH_SHORT).show()
             }
         }
+    }
+
+    /** Play requires the policy to be reachable from inside the app, not just the listing. */
+    private fun setupPrivacyPolicy(view: View) {
+        view.findViewById<MaterialButton>(R.id.btnPrivacyPolicy).setOnClickListener {
+            runCatching {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(getString(R.string.privacy_policy_url))))
+            }.onFailure {
+                Toast.makeText(requireContext(), localized(R.string.something_went_wrong), Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    /**
+     * Self-serve account deletion, which Play requires of any app that lets people sign in.
+     *
+     * What goes is everything the APP holds: the Firebase user (when the account came from
+     * Google/email rather than a bill lookup), the session, the patient tokens and the cached
+     * reports on this phone. What stays is the clinic's own record of their bills and results,
+     * which a diagnostic lab is legally required to retain — the dialog says so rather than
+     * implying a delete reaches further than it does.
+     */
+    private fun setupDeleteAccount(view: View) {
+        view.findViewById<MaterialButton>(R.id.btnDeleteAccount).setOnClickListener {
+            val ctx = requireContext()
+            AlertDialog.Builder(ctx)
+                .setTitle(ctx.localized(R.string.delete_account_title))
+                .setMessage(ctx.localized(R.string.delete_account_message, getString(R.string.reschedule_phone)))
+                .setNegativeButton(ctx.localized(R.string.cancel), null)
+                .setPositiveButton(ctx.localized(R.string.delete_account_confirm)) { _, _ -> deleteAccount() }
+                .show()
+        }
+    }
+
+    private fun deleteAccount() {
+        val ctx = requireContext()
+        val user = FirebaseAuth.getInstance().currentUser
+        if (user == null) {
+            finishDeletion() // a bill-lookup session: nothing exists server-side to delete
+            return
+        }
+        user.delete().addOnCompleteListener { task ->
+            if (!isAdded) return@addOnCompleteListener
+            if (task.isSuccessful) {
+                finishDeletion()
+            } else {
+                // Firebase refuses to delete a user whose sign-in has gone stale.
+                Toast.makeText(ctx, localized(R.string.delete_account_failed), Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    private fun finishDeletion() {
+        val ctx = requireContext()
+        CustomerSessionManager.clear(ctx)
+        SessionManager.clear(ctx)
+        ReportCache.clearAll(ctx)
+        FirebaseAuth.getInstance().signOut()
+        Toast.makeText(ctx, localized(R.string.delete_account_done), Toast.LENGTH_LONG).show()
+        startActivity(
+            Intent(ctx, LoginActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK),
+        )
+        requireActivity().finish()
+    }
+
+    private fun showAppVersion(view: View) {
+        view.findViewById<TextView>(R.id.tvAppVersion).text =
+            requireContext().localized(R.string.app_version, BuildConfig.VERSION_NAME)
     }
 }

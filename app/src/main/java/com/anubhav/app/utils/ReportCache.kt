@@ -130,6 +130,11 @@ object ReportCache {
         file.writeText(gson.toJson(value))
     }
 
+    /** Drops every cached report and bill — used when an account is deleted. */
+    fun clearAll(context: Context) {
+        File(context.filesDir, DIR).deleteRecursively()
+    }
+
     private fun cacheFile(context: Context, key: String): File {
         val safeKey = key.lowercase().replace(Regex("[^a-z0-9_-]"), "_")
         return File(File(context.filesDir, DIR), "$safeKey.json")
