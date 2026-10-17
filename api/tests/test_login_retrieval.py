@@ -16,25 +16,31 @@ def row(key=1, phone=PHONE, name='RINA DAS', bill='2026/09/ALC/4171'):
     return dict(bill_key=key, phone=phone, patientname=name, bill_no=bill, billdate='24/09/2026')
 
 
-class VerifyIdentityTests(unittest.TestCase):
-    def verify(self, rows, name='RINA DAS', phone=PHONE, bill='4171'):
-        with patch.object(pm, '_candidates_mssql', return_value=rows):
-            return pm.verify_customer(name, phone, bill)
+DATE = '2026-09-24'
 
-    def test_all_three_match_logs_in_to_that_phone_only(self):
-        result = self.verify([row(), row(2, OTHER)])
+
+class VerifyIdentityTests(unittest.TestCase):
+    def verify(self, rows, name='RINA DAS', bill='4171', bill_date=DATE):
+        with patch.object(pm, '_candidates_mssql', return_value=rows):
+            return pm.verify_customer(name, bill, bill_date)
+
+    def test_name_date_and_bill_log_in_and_recover_the_phone(self):
+        result = self.verify([row(), row(2, OTHER, name='SUMIT ROY')])
         self.assertTrue(result['matched'])
         self.assertEqual(result['phone'], PHONE)
         self.assertEqual([b['bill_key'] for b in result['bills']], [1])
 
-    def test_mistyped_phone_does_not_log_in(self):
-        result = self.verify([row()], phone=OTHER)
+    def test_a_different_name_does_not_log_in(self):
+        result = self.verify([row()], name='SUMIT ROY')
         self.assertFalse(result['matched'])
         self.assertEqual(result['phone'], '')
 
-    def test_bill_from_another_month_with_same_tail_also_listed_for_that_phone(self):
-        result = self.verify([row(), row(2, bill='2026/08/ALC/4171')])
-        self.assertEqual([b['bill_key'] for b in result['bills']], [1, 2])
+    def test_a_date_in_another_month_does_not_log_in(self):
+        result = self.verify([row()], bill_date='2026-08-24')
+        self.assertFalse(result['matched'])
+
+    def test_the_day_of_the_month_need_not_be_exact(self):
+        self.assertTrue(self.verify([row()], bill_date='2026-09-02')['matched'])
 
     def test_non_ascii_name_is_matched(self):
         result = self.verify([row(name='রিনা দাস')], name='রিনা দাস')
@@ -44,13 +50,40 @@ class VerifyIdentityTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.verify([], bill='%')
 
+    def test_a_bill_with_no_phone_on_file_cannot_open_a_session(self):
+        # The token is scoped to a phone; without one there is nothing to scope to.
+        result = self.verify([row(phone='')])
+        self.assertFalse(result['matched'])
+
+
+class LegacyPhoneLookupTests(unittest.TestCase):
+    """App builds predating the date field send a phone and no date."""
+
+    def verify(self, rows, name='RINA DAS', phone=PHONE, bill='4171'):
+        with patch.object(pm, '_candidates_by_phone_mssql', return_value=rows):
+            return pm.verify_customer(name, bill, '', phone)
+
+    def test_name_phone_and_bill_still_log_in(self):
+        result = self.verify([row(), row(2, OTHER)])
+        self.assertTrue(result['matched'])
+        self.assertEqual(result['phone'], PHONE)
+
+    def test_mistyped_phone_does_not_log_in(self):
+        self.assertFalse(self.verify([row()], phone=OTHER)['matched'])
+
 
 class CandidateQueryTests(unittest.TestCase):
     def test_candidates_are_not_cut_off_by_unrelated_recent_bills(self):
-        for backend, connection in ((pm._candidates_mssql, 'mssql_conn'), (pm._candidates_neon, 'neon_conn')):
+        backends = (
+            (pm._candidates_mssql, 'mssql_conn', ('2026/09', '4171')),
+            (pm._candidates_neon, 'neon_conn', ('2026/09', '4171')),
+            (pm._candidates_by_phone_mssql, 'mssql_conn', (PHONE,)),
+            (pm._candidates_by_phone_neon, 'neon_conn', (PHONE,)),
+        )
+        for backend, connection, args in backends:
             with self.subTest(backend=backend.__name__), patch.object(pm, connection, return_value=MagicMock()), \
                     patch.object(pm, 'fetch_all', return_value=[]) as fetch:
-                backend(PHONE)
+                backend(*args)
                 sql = fetch.call_args.args[1].upper()
                 self.assertNotIn('TOP 500', sql)
                 self.assertNotIn('LIMIT 500', sql)

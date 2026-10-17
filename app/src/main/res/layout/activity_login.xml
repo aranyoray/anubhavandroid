@@ -215,153 +215,174 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="18dp">
+                    android:padding="20dp">
 
+                    <!-- What most patients come for: the receipt lookup, no account needed. -->
                     <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnGoogle"
-                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:id="@+id/btnPhoneAuth"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginBottom="10dp"
-                        android:text="@string/login_with_google"
-                        android:textColor="@color/brand_dark_blue"
-                        app:strokeColor="@color/stroke_soft"
-                        app:cornerRadius="@dimen/button_corner_radius" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnFacebook"
-                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginBottom="16dp"
-                        android:text="@string/login_with_facebook"
-                        android:textColor="@color/brand_dark_blue"
-                        app:strokeColor="@color/stroke_soft"
-                        app:cornerRadius="@dimen/button_corner_radius" />
+                        android:minHeight="56dp"
+                        android:text="@string/continue_with_phone"
+                        android:textSize="16sp"
+                        android:maxLines="1"
+                        android:ellipsize="end"
+                        app:cornerRadius="16dp"
+                        app:icon="@drawable/ic_reports"
+                        app:iconGravity="textStart"
+                        app:iconSize="20dp" />
 
                     <TextView
-                        android:id="@+id/tvOrContinue"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginBottom="16dp"
+                        android:layout_marginTop="8dp"
                         android:gravity="center"
-                        android:text="@string/or_continue_with"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="13sp" />
-
-                    <com.google.android.material.textfield.TextInputLayout
-                        android:id="@+id/layoutClinicPhone"
-                        style="@style/Widget.Anubhav.TextInput"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginBottom="10dp"
-                        android:hint="@string/clinic_registered_phone"
-                        app:boxBackgroundColor="@color/input_background">
-
-                        <com.google.android.material.textfield.TextInputEditText
-                            android:id="@+id/etClinicPhone"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:digits="0123456789 +()-"
-                            android:inputType="phone"
-                            android:singleLine="true" />
-                    </com.google.android.material.textfield.TextInputLayout>
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginBottom="10dp"
                         android:text="@string/clinic_phone_hint"
                         android:textColor="@color/text_secondary"
                         android:textSize="12sp" />
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnPhoneAuth"
-                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginBottom="16dp"
-                        android:ellipsize="end"
-                        android:maxLines="2"
-                        android:text="@string/continue_with_phone"
-                        android:textColor="@color/brand_dark_blue"
-                        app:cornerRadius="@dimen/button_corner_radius"
-                        app:strokeColor="@color/stroke_soft" />
+                        android:layout_marginTop="18dp"
+                        android:layout_marginBottom="18dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <include layout="@layout/include_or_divider" />
+                    </LinearLayout>
 
                     <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnGuest"
-                        style="@style/Widget.MaterialComponents.Button.TextButton"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="-8dp"
-                        android:layout_marginBottom="8dp"
-                        android:minHeight="@dimen/touch_target_min"
-                        android:text="@string/continue_as_guest"
-                        android:textAllCaps="false"
-                        android:textColor="@color/brand_dark_blue" />
-
-                    <com.google.android.material.textfield.TextInputLayout
-                        android:id="@+id/layoutEmail"
-                        style="@style/Widget.Anubhav.TextInput"
+                        android:id="@+id/btnGoogle"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginBottom="10dp"
-                        android:hint="@string/email"
-                        app:boxBackgroundColor="@color/input_background">
+                        android:minHeight="52dp"
+                        android:text="@string/login_with_google"
+                        android:textColor="@color/text_primary"
+                        android:textSize="15sp"
+                        app:cornerRadius="16dp"
+                        app:icon="@drawable/ic_google"
+                        app:iconGravity="textStart"
+                        app:iconPadding="12dp"
+                        app:iconSize="20dp"
+                        app:iconTint="@null"
+                        app:strokeColor="@color/stroke_soft" />
 
-                        <com.google.android.material.textfield.TextInputEditText
-                            android:id="@+id/etEmail"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:inputType="textEmailAddress" />
-                    </com.google.android.material.textfield.TextInputLayout>
-
-                    <com.google.android.material.textfield.TextInputLayout
-                        android:id="@+id/layoutPassword"
-                        style="@style/Widget.Anubhav.TextInput"
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnFacebook"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginBottom="8dp"
-                        android:hint="@string/password"
-                        app:boxBackgroundColor="@color/input_background"
-                        app:endIconMode="password_toggle">
+                        android:minHeight="52dp"
+                        android:text="@string/login_with_facebook"
+                        android:textColor="@color/text_primary"
+                        android:textSize="15sp"
+                        app:cornerRadius="16dp"
+                        app:icon="@drawable/ic_facebook"
+                        app:iconGravity="textStart"
+                        app:iconPadding="12dp"
+                        app:iconSize="20dp"
+                        app:iconTint="@null"
+                        app:strokeColor="@color/stroke_soft" />
 
-                        <com.google.android.material.textfield.TextInputEditText
-                            android:id="@+id/etPassword"
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnEmailToggle"
+                        style="@style/Widget.Material3.Button.TextButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:minHeight="@dimen/touch_target_min"
+                        android:text="@string/login_with_email"
+                        android:textColor="@color/brand_blue"
+                        android:textSize="14sp" />
+
+                    <!-- Collapsed until asked for: most patients never sign in by email. -->
+                    <LinearLayout
+                        android:id="@+id/layoutEmailSection"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:orientation="vertical"
+                        android:visibility="gone">
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:id="@+id/layoutEmail"
+                            style="@style/Widget.Anubhav.TextInput"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:inputType="textPassword" />
-                    </com.google.android.material.textfield.TextInputLayout>
+                            android:layout_marginBottom="10dp"
+                            android:hint="@string/email">
 
-                    <TextView
-                        android:id="@+id/tvForgotPassword"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_gravity="end"
-                        android:layout_marginBottom="12dp"
-                        android:gravity="center_vertical"
-                        android:minHeight="@dimen/touch_target_min"
-                        android:text="@string/forgot_password"
-                        android:textColor="@color/brand_dark_blue"
-                        android:textSize="13sp" />
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/etEmail"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:autofillHints="emailAddress"
+                                android:inputType="textEmailAddress"
+                                android:maxLines="1" />
+                        </com.google.android.material.textfield.TextInputLayout>
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:id="@+id/layoutPassword"
+                            style="@style/Widget.Anubhav.TextInput"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:hint="@string/password"
+                            app:endIconMode="password_toggle">
+
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/etPassword"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:autofillHints="password"
+                                android:inputType="textPassword" />
+                        </com.google.android.material.textfield.TextInputLayout>
+
+                        <TextView
+                            android:id="@+id/tvForgotPassword"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_gravity="end"
+                            android:gravity="center_vertical"
+                            android:minHeight="@dimen/touch_target_min"
+                            android:text="@string/forgot_password"
+                            android:textColor="@color/brand_blue"
+                            android:textSize="13sp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnEmailAuth"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:minHeight="52dp"
+                            android:text="@string/login_with_email"
+                            android:textSize="15sp"
+                            app:cornerRadius="16dp" />
+
+                        <TextView
+                            android:id="@+id/tvToggleAuthMode"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:gravity="center"
+                            android:minHeight="@dimen/touch_target_min"
+                            android:text="@string/dont_have_account"
+                            android:textColor="@color/brand_blue"
+                            android:textSize="13sp" />
+                    </LinearLayout>
 
                     <TextView
                         android:id="@+id/tvLoginError"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginBottom="8dp"
+                        android:layout_marginTop="12dp"
                         android:background="@drawable/error_panel_bg"
-                        android:padding="10dp"
+                        android:padding="12dp"
                         android:textColor="@color/status_error"
                         android:textSize="13sp"
                         android:visibility="gone" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnEmailAuth"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="@string/login_with_email"
-                        app:cornerRadius="@dimen/button_corner_radius" />
 
                     <ProgressBar
                         android:id="@+id/progressLogin"
@@ -373,42 +394,53 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <TextView
-                android:id="@+id/tvToggleAuthMode"
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnGuest"
+                style="@style/Widget.Material3.Button.TextButton"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="20dp"
-                android:gravity="center"
+                android:layout_marginTop="16dp"
                 android:minHeight="@dimen/touch_target_min"
-                android:padding="8dp"
-                android:text="@string/dont_have_account"
-                android:textColor="@color/brand_dark_blue"
+                android:text="@string/continue_as_guest"
+                android:textColor="@color/text_secondary"
                 android:textSize="14sp" />
 
-            <TextView
-                android:id="@+id/tvChangeLanguage"
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
+                android:layout_marginTop="10dp"
                 android:gravity="center_vertical"
-                android:minHeight="@dimen/touch_target_min"
-                android:padding="8dp"
-                android:text="@string/action_settings"
-                android:textColor="@color/text_secondary"
-                android:textSize="13sp" />
+                android:orientation="horizontal">
 
-            <TextView
-                android:id="@+id/tvAdminLogin"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:alpha="0.55"
-                android:gravity="center_vertical"
-                android:minHeight="@dimen/touch_target_min"
-                android:padding="8dp"
-                android:text="@string/admin_login"
-                android:textColor="@color/text_secondary"
-                android:textSize="11sp" />
+                <TextView
+                    android:id="@+id/tvChangeLanguage"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:minHeight="@dimen/touch_target_min"
+                    android:padding="8dp"
+                    android:text="@string/action_settings"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="·"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/tvAdminLogin"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:minHeight="@dimen/touch_target_min"
+                    android:padding="8dp"
+                    android:text="@string/admin_login"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="13sp" />
+            </LinearLayout>
         </LinearLayout>
     </ScrollView>
 

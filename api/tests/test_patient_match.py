@@ -45,10 +45,13 @@ PHONE = "9230755875"
 
 
 class AllThreeMatchTests(unittest.TestCase):
-    """Phone exact, bill number (full or last 3-4 digits) and a fuzzy name must all match."""
+    """Fuzzy name, bill number (full or last 3-4 digits) and the bill's month must all
+    match. A phone is only compared on the legacy pre-date lookup."""
 
-    def matches(self, row, name="PRITI DAS", phone=PHONE, serial="4171", month=None):
-        return pm._row_matches(row, name, pm._norm_phone(phone), serial, month)
+    def matches(self, row, name="PRITI DAS", phone=None, serial="4171", month=None):
+        return pm._row_matches(
+            row, name, serial, month, None if phone is None else pm._norm_phone(phone)
+        )
 
     def test_full_and_three_or_four_digit_tail_match(self):
         row = _row("2026/09/ALC/4171", "20/09/2026", phone=PHONE)
@@ -62,8 +65,9 @@ class AllThreeMatchTests(unittest.TestCase):
     def test_two_digit_tail_is_too_loose(self):
         self.assertFalse(self.matches(_row("2026/09/ALC/4171", "20/09/2026", phone=PHONE), serial="71"))
 
-    def test_phone_must_match_in_full(self):
+    def test_phone_must_match_in_full_on_the_legacy_lookup(self):
         row = _row("2026/09/ALC/4171", "20/09/2026", phone=PHONE)
+        self.assertTrue(self.matches(row, phone=PHONE))
         self.assertFalse(self.matches(row, phone="9230755876"))
 
     def test_misspelt_or_partial_names_still_match(self):
@@ -83,25 +87,36 @@ class AllThreeMatchTests(unittest.TestCase):
         self.assertTrue(self.matches(feb, serial="003", month="2024/02"))
 
 
-class VerifyInputTests(unittest.TestCase):
-    def verify(self, name="Priti Das", phone=PHONE, bill="171", rows=()):
-        with patch.object(pm, "_candidates_mssql", return_value=list(rows)):
-            return pm.verify_customer(name, phone, bill)
+class BillMonthOfTests(unittest.TestCase):
+    def test_iso_date_becomes_a_year_month_prefix(self):
+        self.assertEqual(pm.bill_month_of("2026-09-24"), "2026/09")
+        self.assertEqual(pm.bill_month_of("2024-01-05"), "2024/01")
 
-    def test_all_three_fields_are_required(self):
-        for kwargs in ({"name": ""}, {"phone": ""}, {"bill": ""}):
+    def test_unusable_dates_are_blank(self):
+        for bad in ("", "24/09/2026", "2026-13-01", "not-a-date", None):
+            with self.subTest(bad=bad):
+                self.assertEqual(pm.bill_month_of(bad), "")
+
+
+class VerifyInputTests(unittest.TestCase):
+    def verify(self, name="Priti Das", bill="171", bill_date="2026-09-20", rows=()):
+        with patch.object(pm, "_candidates_mssql", return_value=list(rows)):
+            return pm.verify_customer(name, bill, bill_date)
+
+    def test_name_date_and_bill_are_all_required(self):
+        for kwargs in ({"name": ""}, {"bill_date": ""}, {"bill": ""}):
             with self.subTest(**kwargs), self.assertRaises(ValueError):
                 self.verify(**kwargs)
 
-    def test_phone_needs_all_ten_digits(self):
+    def test_an_unparseable_date_is_rejected(self):
         with self.assertRaises(ValueError):
-            self.verify(phone="923075587")
+            self.verify(bill_date="20/09/2026")
 
     def test_bill_needs_at_least_three_digits(self):
         with self.assertRaises(ValueError):
             self.verify(bill="71")
 
-    def test_verify_returns_report_for_name_phone_and_three_digit_tail(self):
+    def test_verify_returns_report_for_name_date_and_three_digit_tail(self):
         row = {**_row("2026/09/ALC/1003", "20/09/2026", phone=PHONE), "bill_key": 42}
         result = self.verify(name="Preeti Das", bill="003", rows=[row])
         self.assertTrue(result["matched"])

@@ -11,10 +11,10 @@ data class CustomerProfile(
     @SerializedName("regt_key") val regtKey: Int? = null,
 )
 
-/** Guest/patient login: 2 of 3 must match — name, (bill no OR bill date), phone. */
+/** Guest/patient login: name, bill date (ISO) and bill number must all match one bill. */
 data class CustomerVerifyRequest(
     val name: String = "",
-    val phone: String = "",
+    @SerializedName("bill_date") val billDate: String = "",
     @SerializedName("bill_no") val billNo: String = "",
 )
 

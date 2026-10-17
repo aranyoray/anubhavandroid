@@ -1,97 +1,83 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:paddingStart="20dp"
-    android:paddingTop="8dp"
-    android:paddingEnd="20dp"
-    android:paddingBottom="4dp">
+    android:paddingStart="24dp"
+    android:paddingTop="4dp"
+    android:paddingEnd="24dp"
+    android:paddingBottom="8dp">
 
     <TextView
         android:id="@+id/tvLookupHelp"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="12dp"
+        android:layout_marginBottom="20dp"
+        android:lineSpacingExtra="3sp"
         android:textColor="@color/text_secondary"
-        android:textSize="13sp" />
+        android:textSize="14sp" />
 
     <com.google.android.material.textfield.TextInputLayout
         android:id="@+id/layoutLookupName"
         style="@style/Widget.Anubhav.TextInput"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="8dp">
+        app:startIconDrawable="@drawable/ic_account"
+        app:startIconTint="@color/text_secondary">
 
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/etLookupName"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:autofillHints="name"
             android:inputType="textPersonName|textCapWords"
-            android:maxLines="1" />
+            android:maxLines="1"
+            android:textSize="17sp" />
     </com.google.android.material.textfield.TextInputLayout>
 
     <com.google.android.material.textfield.TextInputLayout
-        android:id="@+id/layoutLookupPhone"
+        android:id="@+id/layoutLookupDate"
         style="@style/Widget.Anubhav.TextInput"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="14dp">
+        android:layout_marginTop="16dp"
+        app:startIconDrawable="@drawable/ic_calendar_check"
+        app:startIconTint="@color/text_secondary">
 
+        <!-- Read-only: tapping anywhere opens the date picker. -->
         <com.google.android.material.textfield.TextInputEditText
-            android:id="@+id/etLookupPhone"
+            android:id="@+id/etLookupDate"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:inputType="phone"
-            android:maxLines="1" />
+            android:focusable="false"
+            android:importantForAutofill="no"
+            android:inputType="none"
+            android:maxLines="1"
+            android:textSize="17sp" />
     </com.google.android.material.textfield.TextInputLayout>
 
-    <TextView
-        android:id="@+id/tvLookupBillLabel"
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/layoutLookupBill"
+        style="@style/Widget.Anubhav.TextInput"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="6dp"
-        android:textColor="@color/text_primary"
-        android:textSize="12sp" />
+        android:layout_marginTop="16dp"
+        app:helperTextEnabled="true"
+        app:prefixText="@string/verify_bill_prefix"
+        app:prefixTextColor="@color/text_secondary"
+        app:startIconDrawable="@drawable/ic_receipt"
+        app:startIconTint="@color/text_secondary">
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:background="@drawable/report_bill_input_bg"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingStart="12dp"
-        android:paddingEnd="4dp">
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="ALC/MM/"
-            android:textColor="@color/text_secondary"
-            android:textSize="14sp" />
-
-        <EditText
+        <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/etLookupBillDigits"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:background="@android:color/transparent"
-            android:gravity="center_vertical"
-            android:hint="0000"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:digits="0123456789"
             android:importantForAutofill="no"
             android:inputType="number"
             android:maxLength="4"
             android:maxLines="1"
-            android:paddingStart="2dp"
-            android:textColor="@color/text_primary"
-            android:textSize="16sp" />
-    </LinearLayout>
-
-    <TextView
-        android:id="@+id/tvLookupBillHint"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:textColor="@color/text_secondary"
-        android:textSize="11sp" />
+            android:textSize="17sp" />
+    </com.google.android.material.textfield.TextInputLayout>
 </LinearLayout>

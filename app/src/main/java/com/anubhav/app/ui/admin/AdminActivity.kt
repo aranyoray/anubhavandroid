@@ -337,7 +337,7 @@ class AdminActivity : AppCompatActivity() {
     private fun showEdit(bill: StaffBillDetail) {
         val box = column()
         val name = field(R.string.verify_patient_name_hint, InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS, bill.patientName)
-        val phone = field(R.string.verify_phone_hint, InputType.TYPE_CLASS_PHONE, bill.phone)
+        val phone = field(R.string.admin_phone_hint, InputType.TYPE_CLASS_PHONE, bill.phone)
         val sex = sexPicker(bill.sex)
         val age = field(R.string.admin_age_hint, InputType.TYPE_CLASS_NUMBER, bill.ageYear?.toString().orEmpty())
         val remarks = field(R.string.admin_remarks_hint, InputType.TYPE_CLASS_TEXT, bill.remarks)
@@ -415,7 +415,7 @@ class AdminActivity : AppCompatActivity() {
     private fun showNewBooking() {
         val box = column()
         val name = field(R.string.verify_patient_name_hint, InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS)
-        val phone = field(R.string.verify_phone_hint, InputType.TYPE_CLASS_PHONE)
+        val phone = field(R.string.admin_phone_hint, InputType.TYPE_CLASS_PHONE)
         val sex = sexPicker("MALE")
         val age = field(R.string.admin_age_hint, InputType.TYPE_CLASS_NUMBER)
         val search = field(R.string.admin_test_search_hint, InputType.TYPE_CLASS_TEXT)

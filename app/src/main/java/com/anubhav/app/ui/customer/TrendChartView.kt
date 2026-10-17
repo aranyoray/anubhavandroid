@@ -55,7 +55,7 @@ class TrendChartView @JvmOverloads constructor(
 
     override fun onDraw(canvas: Canvas) {
         if (points.size < 2) return
-        val left = dp(36f); val right = width - dp(12f)
+        val left = dp(36f); val right = width - dp(20f)
         val top = dp(14f); val bottom = height - dp(26f)
 
         val values = points.map { it.value }
@@ -97,9 +97,13 @@ class TrendChartView @JvmOverloads constructor(
             val lx = min(max(px - lw / 2, left), right - lw)
             canvas.drawText(lbl, lx, bottom + dp(16f), textPaint)
         }
-        // Latest value label
+        // Latest value label, centred on its dot but kept inside the plot area so the
+        // rightmost reading is never clipped by the view edge.
         val last = points.last()
-        canvas.drawText(trim(last.value), x(points.size - 1) - dp(2f), y(last.value) - dp(8f), valuePaint)
+        val lastLabel = trim(last.value)
+        val lastWidth = valuePaint.measureText(lastLabel)
+        val lastX = (x(points.size - 1) - lastWidth / 2).coerceIn(left, right - lastWidth)
+        canvas.drawText(lastLabel, lastX, y(last.value) - dp(9f), valuePaint)
     }
 
     private fun trim(v: Float): String =

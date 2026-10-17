@@ -32,9 +32,9 @@
     <string name="login_with_google">Continue with Google</string>
     <string name="login_with_facebook">Continue with Facebook</string>
     <string name="login_with_email">Sign in with Email</string>
-    <string name="continue_with_phone">Continue with Clinic Mobile</string>
+    <string name="continue_with_phone">View my reports</string>
     <string name="sign_up_with_email">Create account with Email</string>
-    <string name="or_continue_with">or continue with email</string>
+    <string name="or_continue_with">or</string>
     <string name="forgot_password">Forgot password?</string>
     <string name="dont_have_account">Don\'t have an account? Sign up</string>
     <string name="already_have_account">Already have an account? Sign in</string>
@@ -73,7 +73,7 @@
     <string name="settings_account_title">Your account</string>
     <string name="settings_saved">Settings saved</string>
     <string name="clinic_registered_phone">Clinic registered mobile</string>
-    <string name="clinic_phone_hint">Use the mobile number registered at the clinic</string>
+    <string name="clinic_phone_hint">No account needed — just your receipt</string>
     <string name="save_clinic_phone">Link mobile number</string>
     <string name="phone_linked">Mobile number linked</string>
     <string name="invalid_phone">Enter a valid 10 digit mobile number</string>
@@ -89,8 +89,8 @@
     <string name="book_appointment">Book Appointment</string>
     <string name="select_tests">Select Tests</string>
     <string name="search_tests">Search tests…</string>
-    <string name="booking_test_search_hint">Search by test name or code</string>
-    <string name="booking_test_search_prompt">Type at least 2 letters or numbers to find a test.</string>
+    <string name="booking_test_search_hint">Search tests — e.g. CBC, TSH</string>
+    <string name="booking_test_search_prompt">Type at least 2 letters to find a test.</string>
     <string name="booking_test_search_empty">No tests found. Try another name or code.</string>
     <string name="booking_test_searching">Searching tests…</string>
     <string name="booking_selected_count">Selected tests: %1$d</string>
@@ -98,19 +98,19 @@
     <string name="booking_added_test">Added</string>
     <string name="booking_remove_test">Remove %1$s</string>
     <string name="preferred_date">Preferred Date</string>
-    <string name="preferred_time">Preferred Time</string>
+    <string name="preferred_time">Preferred time slot</string>
     <string name="booking_type">Booking Type</string>
     <string name="regular_booking">Regular Booking</string>
-    <string name="prebook_time_slot">Book Your Test</string>
+    <string name="prebook_time_slot">Book a test</string>
     <string name="prebook_doctor">Prebook Doctor</string>
     <string name="total_amount">Total Amount</string>
     <string name="advance_payment">Advance Payment</string>
-    <string name="pay_advance" formatted="false">Pay 50% Advance</string>
+    <string name="pay_advance" formatted="false">Pay 50% advance</string>
     <string name="book_now">Book Now</string>
-    <string name="patient_age">Age (years)</string>
+    <string name="patient_age">Age in years</string>
     <string name="patient_sex">Sex</string>
-    <string name="sex_male">MALE</string>
-    <string name="sex_female">FEMALE</string>
+    <string name="sex_male">Male</string>
+    <string name="sex_female">Female</string>
     <string name="slots_remaining">%1$s (%2$d left)</string>
 
     <!-- Home Screen -->
@@ -188,12 +188,13 @@
     <string name="report_values_empty">Values aren\'t available for this report yet.</string>
     <string name="report_values_abnormal">%1$s value(s) outside the normal range</string>
     <string name="report_values_all_normal">All values within range</string>
-    <string name="report_values_ref">Ref: %1$s</string>
-    <string name="report_values_view_trend">View trend</string>
-    <string name="report_values_trend_loading">Loading earlier results…</string>
-    <string name="report_values_trend_none">No earlier readings to chart yet</string>
+    <string name="report_values_ref">Normal range %1$s</string>
+    <string name="report_values_trend_show">Trend · %1$d readings</string>
+    <string name="report_values_trend_hide">Hide trend</string>
+    <string name="report_values_flag_high">High</string>
+    <string name="report_values_flag_low">Low</string>
     <string name="reports_hide_report">Hide values</string>
-    <string name="reports_open_pdf">Open report PDF</string>
+    <string name="reports_open_pdf">Open full report PDF</string>
     <string name="report_values_unavailable">Detailed values aren\'t available — open the PDF instead.</string>
     <string name="report_share_sheet">Share via WhatsApp, Instagram…</string>
     <string name="error">Error</string>
@@ -230,6 +231,7 @@
     <!-- Customer flows -->
     <string name="prebook_date_hint">Choose a date</string>
     <string name="booking_patient_details">Patient details</string>
+    <string name="booking_patient_name_hint">Patient\'s full name</string>
     <string name="booking_schedule">Date and time</string>
     <string name="booking_choose_tests">Choose tests</string>
     <string name="prebook_policy">Reschedule anytime by calling %1$s.</string>
@@ -239,7 +241,7 @@
     <string name="prebook_success">Booked! ALC %1$s. To reschedule call %2$s.</string>
     <string name="phone_required_title">Mobile number needed</string>
     <string name="phone_required">Your account is not linked to a mobile number yet. Bookings and bills use your registered phone at the clinic. Please call or WhatsApp us to link your number.</string>
-    <string name="fill_all_fields">Please fill name, age, sex, date, time slot, and select at least one test.</string>
+    <string name="fill_all_fields">Add the patient\'s name and age, pick a date and time slot, and choose at least one test.</string>
     <string name="payment_failed">Payment failed. No amount was charged.</string>
     <string name="payment_not_configured">Payment gateway is not configured. Please contact the clinic.</string>
     <string name="payment_success">Payment recorded successfully</string>
@@ -257,7 +259,7 @@
     <string name="report_fallback">Report</string>
     <string name="report_status_pending">PENDING</string>
     <string name="report_ready_to_share">Ready to share</string>
-    <string name="reports_login_prompt">Enter the patient name, mobile number and bill number to see reports.</string>
+    <string name="reports_login_prompt">Enter the patient name, bill date and bill number to see reports.</string>
     <string name="reports_loading">Loading your reports…</string>
     <string name="reports_none_for_number">No reports found for this number.</string>
     <string name="reports_visit_count">%1$d visit(s) linked to your number</string>
@@ -324,8 +326,8 @@
     <string name="sign_up_subtitle">Create an account with your email</string>
 
     <!-- Home collection address / GPS autofill -->
-    <string name="use_my_location">Use my current location</string>
-    <string name="address_hint">Home collection address</string>
+    <string name="use_my_location">Use my location</string>
+    <string name="address_hint">Address for home sample collection</string>
     <string name="locating">Getting your location…</string>
     <string name="location_permission_needed">Location permission is needed to autofill your address.</string>
     <string name="location_unavailable">Couldn\'t get your location. Please type your address.</string>
@@ -333,7 +335,7 @@
     <string name="prebook_no_slots">All slots on that date are full. Please pick another date.</string>
 
     <!-- Leaflet + OpenStreetMap pin picker for the home-collection address -->
-    <string name="pick_on_map">Pin my house on the map</string>
+    <string name="pick_on_map">Pin on map</string>
     <string name="location_pinned_value">Pinned at %1$s</string>
     <string name="map_picker_title">Pick your collection point</string>
     <string name="map_search_hint">Search area, street or landmark</string>
@@ -349,18 +351,21 @@
     <string name="map_locate_me">Go to my location</string>
     <string name="map_back">Back</string>
 
-    <!-- 2-of-3 report verification dialog (login + My Reports) -->
+    <!-- Report lookup dialog: name + bill date + bill number (login + My Reports) -->
     <string name="verify_dialog_title_login">View your reports</string>
     <string name="verify_dialog_title_fetch">Fetch another report</string>
-    <string name="verify_dialog_message_short">Enter all three: patient name, mobile number and bill number. The last 3 or 4 digits of the bill number are enough.</string>
-    <string name="verify_bill_digits_hint">last 3 or 4 digits</string>
-    <string name="verify_bill_digits_required">Enter 3 or 4 digits</string>
+    <string name="verify_dialog_message_short">All three are printed on your receipt.</string>
+    <string name="verify_bill_digits_hint">Shown on your receipt as 2610/ALC-1234 — type 1234</string>
+    <string name="verify_bill_digits_required">Enter the last 3 or 4 digits</string>
+    <string name="verify_bill_prefix">YYMM/ALC-</string>
     <string name="verify_patient_name_hint">Patient name</string>
-    <string name="verify_phone_hint">Phone number</string>
-    <string name="verify_bill_no_label">Bill number</string>
+    <string name="verify_bill_date_hint">Bill date</string>
+    <string name="verify_date_required">Choose the date on the bill</string>
+    <string name="verify_name_required">Enter the patient name</string>
+    <string name="verify_bill_no_label">Bill No. (last 3-4 digits)</string>
     <string name="verify_positive_view">View reports</string>
     <string name="verify_positive_find">Find reports</string>
-    <string name="verify_no_match">Details didn\'t match. Check the name, the full mobile number and the bill number.</string>
+    <string name="verify_no_match">No reports matched. Check the name, the bill date and the bill number.</string>
     <string name="verify_showing_reports_for">Showing reports for %1$s</string>
 
     <!-- Time Slots (legacy) -->
@@ -404,9 +409,9 @@
     <string name="login_with_google_bn">Google দিয়ে চালিয়ে যান</string>
     <string name="login_with_facebook_bn">Facebook দিয়ে চালিয়ে যান</string>
     <string name="login_with_email_bn">ইমেল দিয়ে সাইন ইন</string>
-    <string name="continue_with_phone_bn">ক্লিনিকের মোবাইল নম্বর দিয়ে চালিয়ে যান</string>
+    <string name="continue_with_phone_bn">আমার রিপোর্ট দেখুন</string>
     <string name="sign_up_with_email_bn">ইমেল দিয়ে অ্যাকাউন্ট খুলুন</string>
-    <string name="or_continue_with_bn">অথবা ইমেল দিয়ে চালিয়ে যান</string>
+    <string name="or_continue_with_bn">অথবা</string>
     <string name="forgot_password_bn">পাসওয়ার্ড ভুলে গেছেন?</string>
     <string name="dont_have_account_bn">অ্যাকাউন্ট নেই? সাইন আপ করুন</string>
     <string name="already_have_account_bn">আগে থেকেই অ্যাকাউন্ট আছে? সাইন ইন করুন</string>
@@ -431,7 +436,7 @@
     <string name="settings_account_title_bn">আপনার অ্যাকাউন্ট</string>
     <string name="settings_saved_bn">সেটিংস সেভ হয়েছে</string>
     <string name="clinic_registered_phone_bn">ক্লিনিকে রেজিস্টার্ড মোবাইল</string>
-    <string name="clinic_phone_hint_bn">ক্লিনিকে রেজিস্টার করা মোবাইল নম্বরটিই দিন</string>
+    <string name="clinic_phone_hint_bn">অ্যাকাউন্ট লাগবে না — শুধু আপনার রসিদ</string>
     <string name="save_clinic_phone_bn">মোবাইল নম্বর যুক্ত করুন</string>
     <string name="phone_linked_bn">মোবাইল নম্বর যুক্ত হয়ে গেছে</string>
     <string name="invalid_phone_bn">১০ সংখ্যার সঠিক মোবাইল নম্বর দিন</string>
@@ -533,6 +538,7 @@
 
     <string name="prebook_date_hint_bn">তারিখ বেছে নিন</string>
     <string name="booking_patient_details_bn">রোগীর তথ্য</string>
+    <string name="booking_patient_name_hint_bn">রোগীর পুরো নাম</string>
     <string name="booking_schedule_bn">তারিখ ও সময়</string>
     <string name="booking_choose_tests_bn">টেস্ট বেছে নিন</string>
     <string name="prebook_policy_bn">দিন বদলাতে হলে %1$s নম্বরে ফোন করুন।</string>
@@ -559,7 +565,7 @@
     <string name="report_fallback_bn">রিপোর্ট</string>
     <string name="report_status_pending_bn">তৈরি হচ্ছে</string>
     <string name="report_ready_to_share_bn">শেয়ারের জন্য তৈরি</string>
-    <string name="reports_login_prompt_bn">রিপোর্ট দেখতে রোগীর নাম, মোবাইল নম্বর আর বিল নম্বর দিন।</string>
+    <string name="reports_login_prompt_bn">রিপোর্ট দেখতে রোগীর নাম, বিলের তারিখ আর বিল নম্বর দিন।</string>
     <string name="reports_loading_bn">আপনার রিপোর্ট লোড হচ্ছে…</string>
     <string name="reports_none_for_number_bn">এই নম্বরে কোনও রিপোর্ট পাওয়া যায়নি।</string>
     <string name="reports_visit_count_bn">আপনার নম্বরে %1$dটি ভিজিট আছে</string>
@@ -626,7 +632,7 @@
     <string name="sign_up_subtitle_bn">ইমেল দিয়ে অ্যাকাউন্ট খুলুন</string>
 
     <!-- Home collection address / GPS autofill (Bengali) -->
-    <string name="use_my_location_bn">আমার বর্তমান লোকেশন ব্যবহার করুন</string>
+    <string name="use_my_location_bn">আমার লোকেশন</string>
     <string name="address_hint_bn">হোম কালেকশনের ঠিকানা</string>
     <string name="locating_bn">আপনার লোকেশন খোঁজা হচ্ছে…</string>
     <string name="location_permission_needed_bn">ঠিকানা আপনা-আপনি পূরণ করতে লোকেশনের অনুমতি লাগবে।</string>
@@ -635,7 +641,7 @@
     <string name="prebook_no_slots_bn">ওই তারিখে সব স্লট ভর্তি। অন্য একটা তারিখ বেছে নিন।</string>
 
     <!-- Leaflet + OpenStreetMap pin picker (Bengali) -->
-    <string name="pick_on_map_bn">ম্যাপে বাড়িটা দেখিয়ে দিন</string>
+    <string name="pick_on_map_bn">ম্যাপে দেখান</string>
     <string name="location_pinned_value_bn">পিন বসানো হয়েছে %1$s-এ</string>
     <string name="map_picker_title_bn">কোথা থেকে স্যাম্পেল নেব, দেখিয়ে দিন</string>
     <string name="map_search_hint_bn">এলাকা, রাস্তা বা ল্যান্ডমার্ক লিখে খুঁজুন</string>
@@ -654,15 +660,18 @@
     <!-- 2-of-3 report verification dialog (Bengali) -->
     <string name="verify_dialog_title_login_bn">আপনার রিপোর্ট দেখুন</string>
     <string name="verify_dialog_title_fetch_bn">আরেকটি রিপোর্ট আনুন</string>
-    <string name="verify_dialog_message_short_bn">তিনটিই দিন: রোগীর নাম, মোবাইল নম্বর আর বিল নম্বর। বিল নম্বরের শেষ ৩ বা ৪টি সংখ্যাই যথেষ্ট।</string>
-    <string name="verify_bill_digits_hint_bn">শেষ ৩ বা ৪টি সংখ্যা</string>
-    <string name="verify_bill_digits_required_bn">৩ বা ৪টি সংখ্যা লিখুন</string>
+    <string name="verify_dialog_message_short_bn">তিনটিই আপনার রসিদে লেখা আছে।</string>
+    <string name="verify_bill_digits_hint_bn">রসিদে থাকে 2610/ALC-1234 — শুধু 1234 লিখুন</string>
+    <string name="verify_bill_digits_required_bn">শেষ ৩ বা ৪টি সংখ্যা লিখুন</string>
+    <string name="verify_bill_prefix_bn">YYMM/ALC-</string>
     <string name="verify_patient_name_hint_bn">রোগীর নাম</string>
-    <string name="verify_phone_hint_bn">মোবাইল নম্বর</string>
-    <string name="verify_bill_no_label_bn">বিল নম্বর</string>
+    <string name="verify_bill_date_hint_bn">বিলের তারিখ</string>
+    <string name="verify_date_required_bn">বিলে লেখা তারিখ বেছে নিন</string>
+    <string name="verify_name_required_bn">রোগীর নাম লিখুন</string>
+    <string name="verify_bill_no_label_bn">বিল নম্বর (শেষ ৩-৪টি সংখ্যা)</string>
     <string name="verify_positive_view_bn">রিপোর্ট দেখুন</string>
     <string name="verify_positive_find_bn">রিপোর্ট খুঁজুন</string>
-    <string name="verify_no_match_bn">তথ্য মিলল না। নাম, পুরো মোবাইল নম্বর আর বিল নম্বর আরেকবার দেখে নিন।</string>
+    <string name="verify_no_match_bn">কোনও রিপোর্ট মিলল না। নাম, বিলের তারিখ আর বিল নম্বর আরেকবার দেখে নিন।</string>
     <string name="verify_showing_reports_for_bn">%1$s-এর রিপোর্ট দেখানো হচ্ছে</string>
 
     <!-- Admin booking-details section -->
@@ -754,6 +763,8 @@ Net ₹%3$s · Received ₹%4$s</string>
     <string name="admin_test_pending_bn">বাকি</string>
     <string name="admin_age_hint">Age (years)</string>
     <string name="admin_age_hint_bn">বয়স (বছর)</string>
+    <string name="admin_phone_hint">Mobile number</string>
+    <string name="admin_phone_hint_bn">মোবাইল নম্বর</string>
     <string name="admin_remarks_hint">Remarks</string>
     <string name="admin_remarks_hint_bn">মন্তব্য</string>
     <string name="admin_test_search_hint">Search tests (e.g. CBC)</string>
@@ -768,8 +779,6 @@ Net ₹%3$s · Received ₹%4$s</string>
     <string name="admin_booking_fill_bn">নাম, ১০ সংখ্যার ফোন ও অন্তত একটি টেস্ট দিন।</string>
     <string name="admin_booking_done">Bill %1$s created · ₹%2$s</string>
     <string name="admin_booking_done_bn">%1$s বিল তৈরি হয়েছে · ₹%2$s</string>
-    <string name="verify_name_required">Enter the patient name</string>
-    <string name="verify_name_required_bn">রোগীর নাম লিখুন</string>
     <string name="verify_phone_required">Enter the full 10-digit mobile number</string>
     <string name="verify_phone_required_bn">পুরো ১০ সংখ্যার মোবাইল নম্বর দিন</string>
     <string name="continue_as_guest">Continue as guest</string>
@@ -797,12 +806,13 @@ Net ₹%3$s · Received ₹%4$s</string>
     <string name="report_values_empty_bn">এই রিপোর্টের মান এখনও পাওয়া যায়নি।</string>
     <string name="report_values_abnormal_bn">%1$s টি মান স্বাভাবিক সীমার বাইরে</string>
     <string name="report_values_all_normal_bn">সব মান সীমার মধ্যে</string>
-    <string name="report_values_ref_bn">সীমা: %1$s</string>
-    <string name="report_values_view_trend_bn">ট্রেন্ড দেখুন</string>
-    <string name="report_values_trend_loading_bn">আগের ফলাফল আনা হচ্ছে…</string>
-    <string name="report_values_trend_none_bn">চার্ট করার মতো আগের ফলাফল নেই</string>
+    <string name="report_values_ref_bn">স্বাভাবিক সীমা %1$s</string>
+    <string name="report_values_trend_show_bn">ট্রেন্ড · %1$dটি ফলাফল</string>
+    <string name="report_values_trend_hide_bn">ট্রেন্ড লুকান</string>
+    <string name="report_values_flag_high_bn">বেশি</string>
+    <string name="report_values_flag_low_bn">কম</string>
     <string name="reports_hide_report_bn">মান লুকান</string>
-    <string name="reports_open_pdf_bn">রিপোর্ট পিডিএফ খুলুন</string>
+    <string name="reports_open_pdf_bn">পুরো রিপোর্ট পিডিএফ খুলুন</string>
     <string name="report_values_unavailable_bn">বিস্তারিত মান পাওয়া যায়নি — পিডিএফ খুলুন।</string>
     <string name="report_share_sheet_bn">হোয়াটসঅ্যাপ, ইনস্টাগ্রামে শেয়ার করুন…</string>
 </resources>

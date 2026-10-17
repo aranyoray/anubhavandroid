@@ -1,12 +1,16 @@
 """
 Patient verification + report view links for the customer portal.
 
-Login (no OTP): the patient gives three things and ALL THREE must match one bill:
-  1. Phone number  (exact: the full 10-digit mobile on the bill)
-  2. Bill No       (the full ALC number, or just its last 3-4 digits: "4171" or "171"
+Login (no OTP): the patient reads three things off their receipt and ALL THREE must
+match one bill:
+  1. Patient name  (fuzzy: tolerates typos / a missing middle name)
+  2. Bill date     (only the month is used - within a month a serial is already unique,
+                    so misremembering the day still gets them in)
+  3. Bill No       (the full ALC number, or just its last 3-4 digits: "4171" or "171"
                     for 2026/09/ALC/4171 - that is what patients read off the receipt)
-  3. Patient name  (fuzzy: tolerates typos / a missing middle name)
-There is no bill-date option.
+The phone is never typed: it is read back off the matched bill, and the rest of the
+portal keys off it. App builds predating the date field send a phone instead, which is
+still accepted.
 
 Reads LIVE MSSQL first (includes bills made minutes ago); if the clinic database is
 unreachable it answers from the Neon mirror instead, so login and the report list do
@@ -148,13 +152,22 @@ def _serial_matches(row_serial: str, serial: str) -> bool:
     return len(serial) >= 3 and serial.isdigit() and row_serial.endswith(serial)
 
 
-def _row_matches(r: dict, name: str, phone_n: str, serial: str, month_prefix: Optional[str]) -> bool:
-    """True when this bill matches all three: phone, bill number and name.
+def _row_matches(
+    r: dict,
+    name: str,
+    serial: str,
+    month_prefix: Optional[str],
+    phone_n: Optional[str] = None,
+) -> bool:
+    """True when this bill matches the patient name, the bill number and the month.
 
-    A full "YYYY/MM/ALC/NNNN" number also pins the month: ALC numbering restarts
-    every month, so serial 3 exists in Jan, Feb, ... under the same phone.
+    ALC numbering restarts every month, so serial 3 exists in Jan, Feb, ... — the
+    month (taken from the bill date the patient picked, or from a full
+    "YYYY/MM/ALC/NNNN" number) is what makes a serial identify one bill.
+
+    [phone_n] is only passed by the legacy phone-based path; new lookups leave it None.
     """
-    if _norm_phone(r["phone"]) != phone_n:
+    if phone_n is not None and _norm_phone(r["phone"]) != phone_n:
         return False
     if not _serial_matches(_bill_serial(r["bill_no"]), serial):
         return False
@@ -197,7 +210,30 @@ def build_collated_view_link(name: str, bill_no, items: list[dict], base: Option
 NAME_MATCH_THRESHOLD = 0.5
 
 
-def _candidates_mssql(phone_n: str) -> list[dict]:
+def _candidates_mssql(month_prefix: str, serial: str) -> list[dict]:
+    sql = (
+        "SELECT BILL_KEY AS bill_key, RTRIM(BILL_NO) AS bill_no, RTRIM(ISNULL(PHONE,'')) AS phone, "
+        "RTRIM(ISNULL(PATIENTNAME,'')) AS patientname, CONVERT(varchar, BILLDATE, 103) AS billdate "
+        "FROM BILL_HEAD WHERE BILL_NO LIKE %s AND RIGHT(RTRIM(BILL_NO), %s) = %s "
+        "ORDER BY BILL_KEY DESC"
+    )
+    with mssql_conn() as conn, conn.cursor() as cur:
+        return fetch_all(cur, sql, (f"{month_prefix}/%", len(serial), serial))
+
+
+def _candidates_neon(month_prefix: str, serial: str) -> list[dict]:
+    sql = (
+        "SELECT bill_key, rtrim(coalesce(bill_no,'')) AS bill_no, rtrim(coalesce(phone,'')) AS phone, "
+        "rtrim(coalesce(patientname,'')) AS patientname, to_char(billdate,'DD/MM/YYYY') AS billdate "
+        "FROM bill_head WHERE bill_no LIKE %s AND right(rtrim(bill_no), %s) = %s "
+        "ORDER BY bill_key DESC"
+    )
+    with neon_conn() as conn, conn.cursor() as cur:
+        return fetch_all(cur, sql, (f"{month_prefix}/%", len(serial), serial))
+
+
+# Pre-date lookup, kept for app builds already installed on patients' phones.
+def _candidates_by_phone_mssql(phone_n: str) -> list[dict]:
     sql = (
         "SELECT BILL_KEY AS bill_key, RTRIM(BILL_NO) AS bill_no, RTRIM(ISNULL(PHONE,'')) AS phone, "
         "RTRIM(ISNULL(PATIENTNAME,'')) AS patientname, CONVERT(varchar, BILLDATE, 103) AS billdate "
@@ -207,7 +243,7 @@ def _candidates_mssql(phone_n: str) -> list[dict]:
         return fetch_all(cur, sql, (phone_n,))
 
 
-def _candidates_neon(phone_n: str) -> list[dict]:
+def _candidates_by_phone_neon(phone_n: str) -> list[dict]:
     sql = (
         "SELECT bill_key, rtrim(coalesce(bill_no,'')) AS bill_no, rtrim(coalesce(phone,'')) AS phone, "
         "rtrim(coalesce(patientname,'')) AS patientname, to_char(billdate,'DD/MM/YYYY') AS billdate "
@@ -217,46 +253,92 @@ def _candidates_neon(phone_n: str) -> list[dict]:
         return fetch_all(cur, sql, (phone_n,))
 
 
-def verify_customer(name: str, phone: str, bill_no: str) -> dict[str, Any]:
-    """All three must match one bill: the full phone, the bill number (or its last
-    3-4 digits) and the patient name (fuzzy). Returns the matching bills and the
-    phone, which the rest of the portal keys off."""
+def bill_month_of(bill_date: str) -> str:
+    """"YYYY/MM" for an ISO date the patient picked, or "" when it is unusable.
+
+    Only the month is kept: within a month an ALC serial already identifies one bill,
+    so a patient who misremembers the exact day still gets in.
+    """
+    try:
+        d = date.fromisoformat((bill_date or "").strip())
+    except ValueError:
+        return ""
+    return f"{d.year:04d}/{d.month:02d}"
+
+
+def verify_customer(
+    name: str,
+    bill_no: str,
+    bill_date: str = "",
+    phone: str = "",
+) -> dict[str, Any]:
+    """Find the bills matching a patient name, a bill date and a bill number.
+
+    The month comes from [bill_date] (or from a full "YYYY/MM/ALC/NNNN" number) and
+    picks out one ALC serial; the name then has to match that bill fuzzily. The phone
+    is read back OFF the matched bill — it is what the rest of the portal keys off,
+    and the patient never types it.
+
+    [phone] is the pre-date lookup, still accepted so app builds already installed on
+    patients' phones keep working: there the month may be absent and the phone
+    narrows the search instead.
+    """
     name = (name or "").strip()
     bill_no = (bill_no or "").strip()
-    phone_n = _norm_phone(phone)
     serial = _bill_serial(bill_no)
+    phone_n = _norm_phone(phone)
+    legacy = not (bill_date or "").strip() and len(phone_n) == 10
+    # Typing the whole "YYYY/MM/ALC/NNN" is the only way a serial shorter than 3 digits
+    # is unambiguous; the month from a picked date does not vouch for the digits.
+    typed_full_number = bool(_bill_month(bill_no))
+    month_prefix = _bill_month(bill_no) or bill_month_of(bill_date) or None
+
     if not name:
-        raise ValueError("Enter the patient name")
-    if len(phone_n) != 10 or _is_junk_phone(phone_n):
+        raise ValueError("Enter the patient name as printed on the bill")
+    if not month_prefix and not legacy:
+        raise ValueError("Choose the date printed on the bill")
+    if legacy and _is_junk_phone(phone_n):
         raise ValueError("Enter the full 10-digit mobile number registered at the clinic")
-    month_prefix = _bill_month(bill_no) or None
     if (not serial or not serial.isascii() or not serial.isdigit() or len(serial) > 12
-            or (len(serial) < 3 and not month_prefix)):
+            or (len(serial) < 3 and not typed_full_number)):
         raise ValueError("Enter the bill number or its last 3-4 digits as printed on the receipt")
 
+    args = (phone_n,) if legacy else (month_prefix, serial)
+    fetch_live, fetch_mirror = (
+        (_candidates_by_phone_mssql, _candidates_by_phone_neon) if legacy
+        else (_candidates_mssql, _candidates_neon)
+    )
     try:
-        rows = _candidates_mssql(phone_n)
+        rows = fetch_live(*args)
         source = "live"
     except Exception as exc:  # clinic DB down/unreachable - the mirror still knows every bill
         logger.warning("verify: MSSQL unavailable (%s); answering from Neon", exc)
-        rows = _candidates_neon(phone_n)
+        rows = fetch_mirror(*args)
         source = "mirror"
 
     matched, seen = [], set()
     for r in rows:
-        if r["bill_key"] not in seen and _row_matches(r, name, phone_n, serial, month_prefix):
-            seen.add(r["bill_key"])
-            matched.append({
-                "bill_key": r["bill_key"],
-                "bill_no": r["bill_no"],
-                "bill_date": r["billdate"],
-                "patient_name": r["patientname"].strip(),
-            })
+        if r["bill_key"] in seen:
+            continue
+        if not _row_matches(r, name, serial, month_prefix, phone_n if legacy else None):
+            continue
+        seen.add(r["bill_key"])
+        matched.append({
+            "bill_key": r["bill_key"],
+            "bill_no": r["bill_no"],
+            "bill_date": r["billdate"],
+            "patient_name": r["patientname"].strip(),
+        })
 
+    # The phone comes off the bill, so a match hands back the number the clinic has on
+    # file even though the patient only typed a name, a date and a bill number.
+    phone_out = _norm_phone(
+        next((r["phone"] for r in rows if r["bill_key"] == matched[0]["bill_key"]), "")
+    ) if matched else ""
     return {
-        "matched": bool(matched),
+        "matched": bool(matched) and len(phone_out) == 10,
         "patient_name": matched[0]["patient_name"] if matched else "",
-        "phone": phone_n if matched else "",
+        "phone": phone_out if matched else "",
         "bills": matched,
         "source": source,
     }

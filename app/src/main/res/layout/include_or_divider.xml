@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A rule either side of a short label, instead of a bare centred line of text. -->
+<merge xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <View
+        android:layout_width="0dp"
+        android:layout_height="1dp"
+        android:layout_weight="1"
+        android:background="@color/stroke_soft" />
+
+    <TextView
+        android:id="@+id/tvOrContinue"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:text="@string/or_continue_with"
+        android:textColor="@color/text_secondary"
+        android:textSize="12sp" />
+
+    <View
+        android:layout_width="0dp"
+        android:layout_height="1dp"
+        android:layout_weight="1"
+        android:background="@color/stroke_soft" />
+</merge>

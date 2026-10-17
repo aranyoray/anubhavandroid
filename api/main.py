@@ -388,19 +388,23 @@ class CollectorPatientRequest(BaseModel):
 
 
 class CustomerVerifyRequest(BaseModel):
-    """Guest/patient login: name, phone and bill number must all match one bill.
-    Older app builds also send bill_date; it is ignored."""
+    """Guest/patient login: name, bill date and bill number must all match one bill.
+    `bill_date` is ISO (YYYY-MM-DD). `phone` is the pre-date lookup, still accepted so
+    app builds already installed on patients' phones keep working."""
     name: str = ""
-    phone: str = ""
+    bill_date: str = ""
     bill_no: str = ""
+    phone: str = ""
 
 
 @app.post("/api/customer/verify")
 def api_customer_verify(body: CustomerVerifyRequest):
-    if not (body.name.strip() and body.phone.strip() and body.bill_no.strip()):
-        raise HTTPException(status_code=400, detail="Enter the patient name, phone number and bill number")
+    if not (body.name.strip() and body.bill_no.strip()):
+        raise HTTPException(status_code=400, detail="Enter the patient name and bill number")
+    if not (body.bill_date.strip() or body.phone.strip()):
+        raise HTTPException(status_code=400, detail="Choose the date printed on the bill")
     try:
-        result = verify_customer(body.name, body.phone, body.bill_no)
+        result = verify_customer(body.name, body.bill_no, body.bill_date, body.phone)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:

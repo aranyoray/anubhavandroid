@@ -67,7 +67,8 @@ class LoginActivity : AppCompatActivity() {
     private lateinit var btnPhoneAuth: MaterialButton
     private lateinit var etEmail: TextInputEditText
     private lateinit var etPassword: TextInputEditText
-    private lateinit var etClinicPhone: TextInputEditText
+    private lateinit var layoutEmailSection: View
+    private lateinit var btnEmailToggle: MaterialButton
 
     private val googleLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
@@ -128,7 +129,8 @@ class LoginActivity : AppCompatActivity() {
         btnPhoneAuth = findViewById(R.id.btnPhoneAuth)
         etEmail = findViewById(R.id.etEmail)
         etPassword = findViewById(R.id.etPassword)
-        etClinicPhone = findViewById(R.id.etClinicPhone)
+        layoutEmailSection = findViewById(R.id.layoutEmailSection)
+        btnEmailToggle = findViewById(R.id.btnEmailToggle)
     }
 
     private fun setupGoogleSignIn() {
@@ -221,8 +223,17 @@ class LoginActivity : AppCompatActivity() {
         }
 
         btnEmailAuth.setOnClickListener { handleEmailAuth() }
-        btnPhoneAuth.setOnClickListener { handlePhoneAuth() }
+        btnPhoneAuth.setOnClickListener { showClinicVerifyDialog() }
         findViewById<MaterialButton>(R.id.btnGuest).setOnClickListener { continueAsGuest() }
+
+        // Email sign-in stays folded away until asked for; the receipt lookup above is
+        // what nearly every patient actually wants.
+        btnEmailToggle.setOnClickListener {
+            val show = layoutEmailSection.visibility != View.VISIBLE
+            layoutEmailSection.visibility = if (show) View.VISIBLE else View.GONE
+            btnEmailToggle.visibility = if (show) View.GONE else View.VISIBLE
+            hideInlineError()
+        }
 
         findViewById<TextView>(R.id.tvForgotPassword).setOnClickListener {
             val email = etEmail.text?.toString()?.trim().orEmpty()
@@ -319,19 +330,13 @@ class LoginActivity : AppCompatActivity() {
         dialog.show()
     }
 
-    private fun handlePhoneAuth() {
-        hideInlineError()
-        val prefill = etClinicPhone.text?.toString()?.filter { it.isDigit() }.orEmpty().takeLast(10)
-        showClinicVerifyDialog(prefill)
-    }
-
     /**
-     * AKTIV verification (no OTP): the patient enters name, phone and bill number, and all
-     * three must match one bill - the phone exactly, the bill by its last 3-4 digits and the
-     * name loosely. A phone number alone shouldn't unlock someone's reports.
+     * AKTIV verification (no OTP): the patient reads their name, the bill date and the
+     * bill number off the receipt, and all three must match one bill. Holding the receipt
+     * is the proof; the phone comes back off the matched bill rather than being typed.
      */
-    private fun showClinicVerifyDialog(prefillPhone: String) {
-        val form = ReportLookupForm(this, layoutInflater, prefillPhone)
+    private fun showClinicVerifyDialog() {
+        val form = ReportLookupForm(this, layoutInflater, supportFragmentManager)
         val dialog = AlertDialog.Builder(this)
             .setTitle(localized(R.string.verify_dialog_title_login))
             .setView(form.view)
@@ -347,7 +352,7 @@ class LoginActivity : AppCompatActivity() {
                 dialog.getButton(AlertDialog.BUTTON_NEGATIVE).isEnabled = false
                 setLoading(true, R.string.verifying_ellipsis)
                 lifecycleScope.launch {
-                    customerRepo.verify(input.name, input.phone10, input.bill).fold(
+                    customerRepo.verify(input.name, input.billDate, input.bill).fold(
                         onSuccess = { r ->
                             verifyButton.isEnabled = true
                             dialog.setCancelable(true)
@@ -549,8 +554,7 @@ class LoginActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.tvToggleAuthMode).text = localized(
             if (isSignUpMode) R.string.already_have_account else R.string.dont_have_account,
         )
-        findViewById<TextView>(R.id.tvChangeLanguage).text =
-            "${localized(R.string.action_settings)} · ${localized(R.string.settings_language_title)}"
+        findViewById<TextView>(R.id.tvChangeLanguage).text = localized(R.string.settings_language_title)
         findViewById<TextView>(R.id.tvAdminLogin).text = localized(R.string.admin_login)
         findViewById<com.google.android.material.textfield.TextInputLayout>(R.id.layoutEmail).hint =
             localized(R.string.email)

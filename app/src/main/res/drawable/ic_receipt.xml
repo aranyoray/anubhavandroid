@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Stroked, not filled: a filled path would merge the ruled lines into the body. -->
+    <path
+        android:pathData="M6,3h12v17l-2,-1.4 -2,1.4 -2,-1.4 -2,1.4 -2,-1.4 -2,1.4z"
+        android:strokeColor="@color/text_secondary"
+        android:strokeWidth="1.6"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M9.2,8h5.6M9.2,12h5.6"
+        android:strokeColor="@color/text_secondary"
+        android:strokeWidth="1.6"
+        android:strokeLineCap="round" />
+</vector>
