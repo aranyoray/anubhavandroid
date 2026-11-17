@@ -80,6 +80,12 @@ data class CustomerHistoryResponse(
     val phone: String = "",
     val count: Int = 0,
     val visits: List<CustomerVisit> = emptyList(),
+    // Present when the history came from a bill-QR scan (/api/customer/by-qr): the server
+    // resolves the scanned bill's phone and returns a session token for it, so the app can
+    // show every prior report under that number without typing anything.
+    val matched: Boolean = false,
+    @SerializedName("bill_key") val billKey: Int? = null,
+    val token: String? = null,
 )
 
 data class CustomerBill(

@@ -273,6 +273,11 @@
     <string name="reports_login_prompt">Enter the patient name, bill date and bill number to see reports.</string>
     <string name="reports_loading">Loading your reports…</string>
     <string name="reports_none_for_number">No reports found for this number.</string>
+    <string name="reports_scan_bill_qr">Scan bill QR</string>
+    <string name="reports_qr_signed_in">Showing your reports</string>
+    <string name="reports_qr_no_match">No reports found for this bill.</string>
+    <string name="reports_qr_unreadable">That QR could not be read. Scan the QR printed on your Anubhav Life Care bill.</string>
+    <string name="reports_qr_scanner_failed">Could not start the scanner. Please try again.</string>
     <string name="reports_visit_count">%1$d visit(s) linked to your number</string>
     <string name="reports_unavailable">Reports are temporarily unavailable. The clinic server is off from midnight to 7 AM - please try again after 7.</string>
     <string name="reports_patient_fallback">Patient</string>
@@ -587,6 +592,11 @@
     <string name="reports_login_prompt_bn">রিপোর্ট দেখতে রোগীর নাম, বিলের তারিখ আর বিল নম্বর দিন।</string>
     <string name="reports_loading_bn">আপনার রিপোর্ট লোড হচ্ছে…</string>
     <string name="reports_none_for_number_bn">এই নম্বরে কোনও রিপোর্ট পাওয়া যায়নি।</string>
+    <string name="reports_scan_bill_qr_bn">বিলের QR স্ক্যান করুন</string>
+    <string name="reports_qr_signed_in_bn">আপনার রিপোর্ট দেখানো হচ্ছে</string>
+    <string name="reports_qr_no_match_bn">এই বিলের জন্য কোনও রিপোর্ট পাওয়া যায়নি।</string>
+    <string name="reports_qr_unreadable_bn">QR পড়া গেল না। আপনার অনুভব লাইফ কেয়ার বিলে ছাপা QR স্ক্যান করুন।</string>
+    <string name="reports_qr_scanner_failed_bn">স্ক্যানার চালু করা গেল না। আবার চেষ্টা করুন।</string>
     <string name="reports_visit_count_bn">আপনার নম্বরে %1$dটি ভিজিট আছে</string>
     <string name="reports_unavailable_bn">রিপোর্ট এখন দেখা যাচ্ছে না। রাত ১২টা থেকে সকাল ৭টা ক্লিনিকের সার্ভার বন্ধ থাকে - ৭টার পরে আবার দেখুন।</string>
     <string name="reports_patient_fallback_bn">রোগী</string>

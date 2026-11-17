@@ -60,6 +60,10 @@ class CustomerRepository(
     suspend fun getHistory(phone: String): Result<com.anubhav.app.data.model.CustomerHistoryResponse> =
         apiResult { api.getHistory(phone.trim()) }
 
+    /** Sign in from a scanned bill QR; the response carries the resolved phone + token. */
+    suspend fun byQr(data: String): Result<com.anubhav.app.data.model.CustomerHistoryResponse> =
+        apiResult { api.byQr(data.trim()) }
+
     /**
      * Same history, but the retrieved PII is cached on the device (files dir, excluded
      * from cloud backup via allowBackup=false) so it stays local and works offline.

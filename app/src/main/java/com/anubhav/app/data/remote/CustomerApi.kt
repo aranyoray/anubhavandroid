@@ -27,6 +27,14 @@ interface CustomerApi {
     @GET("api/customer/history")
     suspend fun getHistory(@Query("phone") phone: String): CustomerHistoryResponse
 
+    /**
+     * Sign in by scanning the QR printed on an AKTIV bill. [data] is the raw scanned
+     * content (the report_view.php URL or its token). The server decodes it to the bill's
+     * phone and returns that phone's full history plus a patient token.
+     */
+    @GET("api/customer/by-qr")
+    suspend fun byQr(@Query("data") data: String): CustomerHistoryResponse
+
     @GET("api/customer/profile")
     suspend fun getProfile(
         @Query("phone") phone: String? = null,

@@ -173,6 +173,9 @@ dependencies {
     implementation("com.google.firebase:firebase-auth-ktx")
     implementation("com.google.android.gms:play-services-auth:21.2.0")
 
+    // Bill-QR sign-in: Google Code Scanner (no camera permission; UI + ML Kit via Play Services)
+    implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
+
     // Facebook Login
     implementation("com.facebook.android:facebook-login:17.0.2")
 

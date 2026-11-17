@@ -507,3 +507,32 @@ def customer_history(phone: str) -> dict[str, Any]:
         "visits": visits,
         "source": "live+mirror" if (neon_ok and live_ok) else ("mirror" if neon_ok else "live"),
     }
+
+
+def phone_for_bill_key(bill_key: int) -> "Optional[str]":
+    """The 10-digit phone on a bill, from live MSSQL (falls back to the Neon mirror).
+
+    Used by the QR path: a scanned bill proves ownership, so we resolve its phone and then
+    reuse customer_history(phone) to show every report under that number.
+    """
+    try:
+        with mssql_conn() as conn, conn.cursor() as cur:
+            rows = fetch_all(
+                cur,
+                "SELECT RTRIM(ISNULL(PHONE,'')) AS phone FROM BILL_HEAD WHERE BILL_KEY = %s",
+                (int(bill_key),),
+            )
+    except Exception as exc:  # live DB down - try the mirror
+        logger.warning("phone_for_bill_key: live DB unavailable (%s); trying mirror", exc)
+        rows = []
+        try:
+            with neon_conn() as conn, conn.cursor() as cur:
+                cur.execute("SELECT phone FROM bill_head WHERE bill_key = %s", (int(bill_key),))
+                rows = [{"phone": r[0]} for r in cur.fetchall()]
+        except Exception as exc2:  # noqa: BLE001
+            logger.warning("phone_for_bill_key: mirror also unavailable (%s)", exc2)
+            return None
+    if not rows:
+        return None
+    ph = _norm_phone(rows[0].get("phone"))
+    return ph if len(ph) == 10 else None

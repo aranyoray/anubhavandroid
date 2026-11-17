@@ -25,6 +25,9 @@ import com.anubhav.app.utils.PatientTokens
 import com.anubhav.app.utils.ReportFetcher
 import com.anubhav.app.utils.localized
 import com.google.android.material.button.MaterialButton
+import com.google.mlkit.vision.barcode.common.Barcode
+import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
+import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
@@ -492,10 +495,65 @@ class MyReportsFragment : Fragment() {
         get() = if (shownPhone.isBlank()) R.string.verify_dialog_title_login else R.string.verify_dialog_title_fetch
 
     private fun addFetchOtherButton() {
-        listContainer.addView(outlinedButton(lookupTitle).apply {
+        // Scan the QR printed on any AKTIV bill -> instantly show every report under that
+        // bill's phone number. No typing needed; the bill is the proof.
+        listContainer.addView(filledButton(R.string.reports_scan_bill_qr).apply {
             layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(20) }
+            setOnClickListener { scanBillQr() }
+        })
+        listContainer.addView(outlinedButton(lookupTitle).apply {
+            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(10) }
             setOnClickListener { showFetchOtherDialog() }
         })
+    }
+
+    /** Open the Google code scanner, then sign in from the scanned bill QR. */
+    private fun scanBillQr() {
+        val ctx = requireContext()
+        val options = GmsBarcodeScannerOptions.Builder()
+            .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
+            .build()
+        GmsBarcodeScanning.getClient(ctx, options).startScan()
+            .addOnSuccessListener { barcode ->
+                val raw = barcode.rawValue?.trim().orEmpty()
+                if (raw.isBlank()) {
+                    Toast.makeText(ctx, localized(R.string.reports_qr_unreadable), Toast.LENGTH_LONG).show()
+                } else {
+                    signInFromQr(raw)
+                }
+            }
+            .addOnCanceledListener { /* user backed out */ }
+            .addOnFailureListener {
+                Toast.makeText(ctx, localized(R.string.reports_qr_scanner_failed), Toast.LENGTH_LONG).show()
+            }
+    }
+
+    private fun signInFromQr(data: String) {
+        val ctx = requireContext()
+        statusView.text = localized(R.string.reports_loading)
+        viewLifecycleOwner.lifecycleScope.launch {
+            repo.byQr(data).fold(
+                onSuccess = { res ->
+                    if (res.matched && res.phone.isNotBlank()) {
+                        PatientTokens.save(res.phone, res.token)
+                        PatientTokens.sessionPhone = res.phone
+                        Toast.makeText(ctx, localized(R.string.reports_qr_signed_in), Toast.LENGTH_SHORT).show()
+                        loadHistory(res.phone)
+                    } else {
+                        Toast.makeText(ctx, localized(R.string.reports_qr_no_match), Toast.LENGTH_LONG).show()
+                    }
+                },
+                onFailure = { err ->
+                    val code = (err as? retrofit2.HttpException)?.code()
+                    val msg = when (code) {
+                        400 -> localized(R.string.reports_qr_unreadable)
+                        404 -> localized(R.string.reports_qr_no_match)
+                        else -> localized(R.string.network_error)
+                    }
+                    Toast.makeText(ctx, msg, Toast.LENGTH_LONG).show()
+                },
+            )
+        }
     }
 
     /** Name + date + bill verification, for the patient's own reports or a relative's. */

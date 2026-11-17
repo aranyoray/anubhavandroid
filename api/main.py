@@ -39,7 +39,8 @@ from collector_portal import (
     list_collector_patients,
     list_collector_reports,
 )
-from patient_match import _norm_phone, customer_history, verify_customer
+from patient_match import _norm_phone, customer_history, phone_for_bill_key, verify_customer
+from qr_token import decrypt_token
 from report_pdf import ReportUnavailable, collated_report_pdf
 from report_values import report_values, report_values_debug
 from staff_portal import bill_detail, edit_bill, search_bills
@@ -422,6 +423,41 @@ def api_customer_history(phone: str, x_patient_token: str = PATIENT_TOKEN):
         return customer_history(ph)
     except Exception as exc:
         raise internal_error(exc) from exc
+
+
+@app.get("/api/customer/by-qr")
+def api_customer_by_qr(data: str):
+    """Sign in by scanning the QR on an AKTIV bill.
+
+    `data` is the scanned QR content (the full report_view.php URL, a bare `f=` token, or
+    just the token). It is decoded locally to its BILL_KEY; we resolve that bill's phone
+    and return the same history payload as a phone login plus a patient token scoped to
+    that phone, so the app then shows every prior report under the number. The report host
+    is never contacted for this.
+    """
+    try:
+        qr = decrypt_token(data)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"Could not read this QR: {exc}") from exc
+    except Exception as exc:
+        raise internal_error(exc) from exc
+
+    try:
+        phone = phone_for_bill_key(qr.bill_key)
+    except Exception as exc:
+        raise internal_error(exc) from exc
+    if not phone:
+        raise HTTPException(status_code=404, detail="No phone number is on file for this bill")
+
+    try:
+        result = customer_history(phone)
+    except Exception as exc:
+        raise internal_error(exc) from exc
+
+    result["matched"] = True
+    result["bill_key"] = qr.bill_key
+    result["token"] = tokens.patient_token(phone)
+    return result
 
 
 @app.get("/api/customer/report-values")
