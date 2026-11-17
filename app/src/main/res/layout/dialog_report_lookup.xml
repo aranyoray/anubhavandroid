@@ -37,22 +37,20 @@
     </com.google.android.material.textfield.TextInputLayout>
 
     <com.google.android.material.textfield.TextInputLayout
-        android:id="@+id/layoutLookupDate"
+        android:id="@+id/layoutLookupPhone"
         style="@style/Widget.Anubhav.TextInput"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
-        app:startIconDrawable="@drawable/ic_calendar_check"
+        app:startIconDrawable="@drawable/ic_phone"
         app:startIconTint="@color/text_secondary">
 
-        <!-- Read-only: tapping anywhere opens the date picker. -->
         <com.google.android.material.textfield.TextInputEditText
-            android:id="@+id/etLookupDate"
+            android:id="@+id/etLookupPhone"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:focusable="false"
-            android:importantForAutofill="no"
-            android:inputType="none"
+            android:autofillHints="phone"
+            android:inputType="phone"
             android:maxLines="1"
             android:textSize="17sp" />
     </com.google.android.material.textfield.TextInputLayout>

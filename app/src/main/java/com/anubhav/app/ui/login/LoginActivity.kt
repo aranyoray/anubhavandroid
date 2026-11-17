@@ -352,7 +352,7 @@ class LoginActivity : AppCompatActivity() {
                 dialog.getButton(AlertDialog.BUTTON_NEGATIVE).isEnabled = false
                 setLoading(true, R.string.verifying_ellipsis)
                 lifecycleScope.launch {
-                    customerRepo.verify(input.name, input.billDate, input.bill).fold(
+                    customerRepo.verify(input.name, input.phone, input.bill).fold(
                         onSuccess = { r ->
                             verifyButton.isEnabled = true
                             dialog.setCancelable(true)

@@ -376,6 +376,7 @@
     <string name="verify_bill_prefix">YYMM/ALC-</string>
     <string name="verify_patient_name_hint">Patient name</string>
     <string name="verify_bill_date_hint">Bill date</string>
+    <string name="verify_phone_optional_hint">Mobile number (optional)</string>
     <string name="verify_date_required">Choose the date on the bill</string>
     <string name="verify_name_required">Enter the patient name</string>
     <string name="verify_bill_no_label">Bill No. (last 3-4 digits)</string>
@@ -695,6 +696,7 @@
     <string name="verify_bill_prefix_bn">YYMM/ALC-</string>
     <string name="verify_patient_name_hint_bn">রোগীর নাম</string>
     <string name="verify_bill_date_hint_bn">বিলের তারিখ</string>
+    <string name="verify_phone_optional_hint_bn">মোবাইল নম্বর (ঐচ্ছিক)</string>
     <string name="verify_date_required_bn">বিলে লেখা তারিখ বেছে নিন</string>
     <string name="verify_name_required_bn">রোগীর নাম লিখুন</string>
     <string name="verify_bill_no_label_bn">বিল নম্বর (শেষ ৩-৪টি সংখ্যা)</string>

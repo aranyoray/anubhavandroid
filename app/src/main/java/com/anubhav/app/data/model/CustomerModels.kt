@@ -16,6 +16,7 @@ data class CustomerVerifyRequest(
     val name: String = "",
     @SerializedName("bill_date") val billDate: String = "",
     @SerializedName("bill_no") val billNo: String = "",
+    val phone: String = "",
 )
 
 data class VerifiedBill(

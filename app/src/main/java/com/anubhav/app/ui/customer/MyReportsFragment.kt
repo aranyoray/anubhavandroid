@@ -578,7 +578,7 @@ class MyReportsFragment : Fragment() {
                 dialog.setCancelable(false)
                 dialog.getButton(AlertDialog.BUTTON_NEGATIVE).isEnabled = false
                 viewLifecycleOwner.lifecycleScope.launch {
-                    repo.verify(input.name, input.billDate, input.bill).fold(
+                    repo.verify(input.name, input.phone, input.bill).fold(
                         onSuccess = { r ->
                             verifyButton.isEnabled = true
                             dialog.setCancelable(true)

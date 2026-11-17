@@ -46,10 +46,10 @@ class CustomerRepository(
     /** Patient login: name (fuzzy), bill date (ISO) and bill number's last 3-4 digits. */
     suspend fun verify(
         name: String,
-        billDate: String,
+        phone: String,
         billNo: String = "",
     ): Result<CustomerVerifyResponse> = apiResult {
-        api.verify(CustomerVerifyRequest(name.trim(), billDate.trim(), billNo.trim())).also {
+        api.verify(CustomerVerifyRequest(name.trim(), "", billNo.trim(), phone.trim())).also {
             check(!it.matched || !it.token.isNullOrBlank()) {
                 "The server did not return a verified session. Please contact the clinic to update the API."
             }
