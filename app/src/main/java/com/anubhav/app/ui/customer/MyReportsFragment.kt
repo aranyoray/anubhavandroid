@@ -132,7 +132,11 @@ class MyReportsFragment : Fragment() {
     private fun showVerifyPrompt() {
         listContainer.removeAllViews()
         statusView.text = localized(R.string.reports_verify_again)
-        listContainer.addView(filledButton(R.string.reports_verify_button).apply {
+        listContainer.addView(filledButton(R.string.reports_scan_bill_qr).apply {
+            setOnClickListener { scanBillQr() }
+        })
+        listContainer.addView(outlinedButton(R.string.reports_verify_button).apply {
+            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(10) }
             setOnClickListener { showFetchOtherDialog() }
         })
     }

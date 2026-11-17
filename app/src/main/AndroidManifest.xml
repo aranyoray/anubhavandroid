@@ -37,6 +37,12 @@
             android:name="com.facebook.sdk.ClientToken"
             android:value="@string/facebook_client_token" />
 
+        <!-- Make Play Services fetch the barcode/QR scanner module at install time, so the
+             first "Scan bill QR" tap opens immediately instead of failing while it downloads. -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="barcode_ui" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

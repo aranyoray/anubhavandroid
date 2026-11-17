@@ -27,7 +27,9 @@ data class ReportLookupInput(val name: String, val billDate: String, val bill: S
     @StringRes
     fun problem(): Int? = when {
         name.isBlank() -> R.string.verify_name_required
-        billDate.isBlank() -> R.string.verify_date_required
+        // The bill date is optional: the name (fuzzy) plus the bill number's last 3-4
+        // digits are enough to find the bill. The date only helps when the same serial
+        // exists in more than one month.
         bill.length !in 3..4 || !bill.all(Char::isDigit) -> R.string.verify_bill_digits_required
         else -> null
     }
