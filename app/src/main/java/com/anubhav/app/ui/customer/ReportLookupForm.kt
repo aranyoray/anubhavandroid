@@ -15,13 +15,15 @@ import com.google.android.material.textfield.TextInputLayout
 data class ReportLookupInput(val name: String, val phone: String, val bill: String) {
     /**
      * The first problem as a string resource, or null when the details can be sent. The
-     * server matches the name fuzzily and the bill number by its last 3-4 digits; the
-     * phone is optional and only helps (it is often a collector's or a wrong number on the
-     * bill, so it never blocks access).
+     * server matches the name fuzzily and the bill number by its last 3-4 digits. The app
+     * sends no bill date, so the mobile number is what narrows the search to one month's
+     * bills: without it /api/customer/verify answers 400 "Choose the date printed on the
+     * bill", which reached the patient as a confusing lookup failure.
      */
     @StringRes
     fun problem(): Int? = when {
         name.isBlank() -> R.string.verify_name_required
+        phone.count(Char::isDigit) != 10 -> R.string.verify_phone_required
         bill.length !in 3..4 || !bill.all(Char::isDigit) -> R.string.verify_bill_digits_required
         else -> null
     }
@@ -45,7 +47,7 @@ class ReportLookupForm(
     init {
         view.findViewById<TextView>(R.id.tvLookupHelp).text = ctx.localized(R.string.verify_dialog_message_short)
         layoutName.hint = ctx.localized(R.string.verify_patient_name_hint)
-        layoutPhone.hint = ctx.localized(R.string.verify_phone_optional_hint)
+        layoutPhone.hint = ctx.localized(R.string.verify_phone_hint)
         layoutBill.hint = ctx.localized(R.string.verify_bill_no_label)
         layoutBill.helperText = ctx.localized(R.string.verify_bill_digits_hint)
     }
@@ -64,6 +66,7 @@ class ReportLookupForm(
         val message = ctx.localized(problem)
         when (problem) {
             R.string.verify_name_required -> layoutName.error = message
+            R.string.verify_phone_required -> layoutPhone.error = message
             else -> layoutBill.error = message
         }
         return null

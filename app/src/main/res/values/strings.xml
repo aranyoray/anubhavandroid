@@ -277,6 +277,7 @@
     <string name="reports_qr_signed_in">Showing your reports</string>
     <string name="reports_qr_no_match">No reports found for this bill.</string>
     <string name="reports_qr_unreadable">That QR could not be read. Scan the QR printed on your Anubhav Life Care bill.</string>
+    <string name="reports_access_refused">The clinic server refused this app. Update the app from the Play Store, or call the clinic.</string>
     <string name="reports_qr_scanner_failed">Could not start the scanner. Please try again.</string>
     <string name="reports_visit_count">%1$d visit(s) linked to your number</string>
     <string name="reports_unavailable">Reports are temporarily unavailable. The clinic server is off from midnight to 7 AM - please try again after 7.</string>
@@ -376,13 +377,13 @@
     <string name="verify_bill_prefix">YYMM/ALC-</string>
     <string name="verify_patient_name_hint">Patient name</string>
     <string name="verify_bill_date_hint">Bill date</string>
-    <string name="verify_phone_optional_hint">Mobile number (optional)</string>
+    <string name="verify_phone_hint">Mobile number (10 digits)</string>
     <string name="verify_date_required">Choose the date on the bill</string>
     <string name="verify_name_required">Enter the patient name</string>
     <string name="verify_bill_no_label">Bill No. (last 3-4 digits)</string>
     <string name="verify_positive_view">View reports</string>
     <string name="verify_positive_find">Find reports</string>
-    <string name="verify_no_match">No reports matched. Check the name, the bill date and the bill number.</string>
+    <string name="verify_no_match">No reports matched. Check the name, the mobile number and the bill number.</string>
     <string name="verify_showing_reports_for">Showing reports for %1$s</string>
 
     <!-- Time Slots (legacy) -->
@@ -597,6 +598,7 @@
     <string name="reports_qr_signed_in_bn">আপনার রিপোর্ট দেখানো হচ্ছে</string>
     <string name="reports_qr_no_match_bn">এই বিলের জন্য কোনও রিপোর্ট পাওয়া যায়নি।</string>
     <string name="reports_qr_unreadable_bn">QR পড়া গেল না। আপনার অনুভব লাইফ কেয়ার বিলে ছাপা QR স্ক্যান করুন।</string>
+    <string name="reports_access_refused_bn">ক্লিনিকের সার্ভার এই অ্যাপটি নিল না। প্লে স্টোর থেকে অ্যাপটি আপডেট করুন, বা ক্লিনিকে ফোন করুন।</string>
     <string name="reports_qr_scanner_failed_bn">স্ক্যানার চালু করা গেল না। আবার চেষ্টা করুন।</string>
     <string name="reports_visit_count_bn">আপনার নম্বরে %1$dটি ভিজিট আছে</string>
     <string name="reports_unavailable_bn">রিপোর্ট এখন দেখা যাচ্ছে না। রাত ১২টা থেকে সকাল ৭টা ক্লিনিকের সার্ভার বন্ধ থাকে - ৭টার পরে আবার দেখুন।</string>
@@ -696,13 +698,13 @@
     <string name="verify_bill_prefix_bn">YYMM/ALC-</string>
     <string name="verify_patient_name_hint_bn">রোগীর নাম</string>
     <string name="verify_bill_date_hint_bn">বিলের তারিখ</string>
-    <string name="verify_phone_optional_hint_bn">মোবাইল নম্বর (ঐচ্ছিক)</string>
+    <string name="verify_phone_hint_bn">মোবাইল নম্বর (১০ সংখ্যা)</string>
     <string name="verify_date_required_bn">বিলে লেখা তারিখ বেছে নিন</string>
     <string name="verify_name_required_bn">রোগীর নাম লিখুন</string>
     <string name="verify_bill_no_label_bn">বিল নম্বর (শেষ ৩-৪টি সংখ্যা)</string>
     <string name="verify_positive_view_bn">রিপোর্ট দেখুন</string>
     <string name="verify_positive_find_bn">রিপোর্ট খুঁজুন</string>
-    <string name="verify_no_match_bn">কোনও রিপোর্ট মিলল না। নাম, বিলের তারিখ আর বিল নম্বর আরেকবার দেখে নিন।</string>
+    <string name="verify_no_match_bn">কোনও রিপোর্ট মিলল না। নাম, মোবাইল নম্বর আর বিল নম্বর আরেকবার দেখে নিন।</string>
     <string name="verify_showing_reports_for_bn">%1$s-এর রিপোর্ট দেখানো হচ্ছে</string>
 
     <!-- Admin booking-details section -->

@@ -19,6 +19,7 @@ import com.anubhav.app.data.model.CustomerVisit
 import com.anubhav.app.data.model.ReportGroup
 import com.anubhav.app.data.model.ReportParam
 import com.anubhav.app.data.model.ReportValuesResponse
+import com.anubhav.app.data.repository.AdminRepository
 import com.anubhav.app.data.repository.CustomerRepository
 import com.anubhav.app.utils.CustomerSessionManager
 import com.anubhav.app.utils.PatientTokens
@@ -552,6 +553,9 @@ class MyReportsFragment : Fragment() {
                     val msg = when (code) {
                         400 -> localized(R.string.reports_qr_unreadable)
                         404 -> localized(R.string.reports_qr_no_match)
+                        // A refusal by the server is not a dead network; saying "check your
+                        // internet" sent patients hunting for a connection that was fine.
+                        401, 403 -> localized(R.string.reports_access_refused)
                         else -> localized(R.string.network_error)
                     }
                     Toast.makeText(ctx, msg, Toast.LENGTH_LONG).show()
@@ -597,7 +601,15 @@ class MyReportsFragment : Fragment() {
                             verifyButton.isEnabled = true
                             dialog.setCancelable(true)
                             dialog.getButton(AlertDialog.BUTTON_NEGATIVE).isEnabled = true
-                            Toast.makeText(ctx, it.message ?: localized(R.string.network_error), Toast.LENGTH_LONG).show()
+                            // "HTTP 400" / "HTTP 401" told the patient nothing. Show what the
+                            // server said, and name the one cause they cannot act on.
+                            val code = (it as? retrofit2.HttpException)?.code()
+                            val msg = if (code == 401 || code == 403) {
+                                localized(R.string.reports_access_refused)
+                            } else {
+                                AdminRepository.messageOf(it) ?: localized(R.string.network_error)
+                            }
+                            Toast.makeText(ctx, msg, Toast.LENGTH_LONG).show()
                         },
                     )
                 }

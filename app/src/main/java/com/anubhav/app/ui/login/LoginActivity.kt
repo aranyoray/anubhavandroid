@@ -382,7 +382,14 @@ class LoginActivity : AppCompatActivity() {
                             verifyButton.isEnabled = true
                             dialog.setCancelable(true)
                             dialog.getButton(AlertDialog.BUTTON_NEGATIVE).isEnabled = true
-                            Toast.makeText(this@LoginActivity, AdminRepository.messageOf(err) ?: err.localizedMessage ?: localized(R.string.network_error), Toast.LENGTH_LONG).show()
+                            val code = (err as? retrofit2.HttpException)?.code()
+                            val msg = if (code == 401 || code == 403) {
+                                // An unkeyed/rejected build, not the patient's details.
+                                localized(R.string.reports_access_refused)
+                            } else {
+                                AdminRepository.messageOf(err) ?: err.localizedMessage ?: localized(R.string.network_error)
+                            }
+                            Toast.makeText(this@LoginActivity, msg, Toast.LENGTH_LONG).show()
                         },
                     )
                 }
