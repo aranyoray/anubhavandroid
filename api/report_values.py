@@ -93,6 +93,47 @@ def _pick(cols: dict[str, str], candidates: list[str]) -> str | None:
     return None
 
 
+def _list_tables(cur) -> set[str]:
+    """Every base table name present, UPPER-cased."""
+    try:
+        rows = fetch_all(
+            cur,
+            "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE'",
+        )
+    except Exception:
+        return set()
+    return {(r["TABLE_NAME"] or "").upper() for r in rows}
+
+
+def _dept_tables(cur) -> list[tuple[str, str, str | None]]:
+    """The hardcoded department tables, plus every other ``*_DTLS`` table actually present.
+
+    AKTIV installs name their result tables differently (CHEMISTRY_DTLS vs CHEMICAL_DTLS,
+    extra panels, renamed heads), so the fixed list silently returns nothing on a schema it
+    does not match - which is exactly a report with a full PDF but no on-screen values.
+    Discover the real tables instead: any ``*_DTLS`` carrying a parameter column, filtered
+    by BILL_KEY when it has one, else joined through its matching ``*_HEAD``.
+    """
+    tables = list(DEPT_TABLES)
+    known = {t[0].upper() for t in tables}
+    present = _list_tables(cur)
+    for name in sorted(present):
+        if not name.endswith("_DTLS") or name in known:
+            continue
+        cols = _columns(cur, name)
+        if not _pick(cols, PARAM_COLS):
+            continue
+        if "BILL_KEY" in cols:
+            tables.append((name, "bill_key", None))
+        elif "REPORT_KEY" in cols:
+            head = name[:-5] + "_HEAD"
+            if head in present:
+                hcols = _columns(cur, head)
+                if "BILL_KEY" in hcols and "REPORT_KEY" in hcols:
+                    tables.append((name, "report_key", head))
+    return tables
+
+
 def _as_str(value: Any) -> str:
     return str(value).strip() if value is not None else ""
 
@@ -123,7 +164,7 @@ def report_values(*, bill_key: int, phone: str | None = None) -> dict[str, Any]:
         confirmed = {r["report_key"] for r in confirmed_rows}
 
         by_report: dict[tuple, list[dict]] = {}
-        for table, strategy, head_table in DEPT_TABLES:
+        for table, strategy, head_table in _dept_tables(cur):
             cols = _columns(cur, table)
             if not cols:
                 continue
@@ -206,7 +247,7 @@ def report_values_debug(*, bill_key: int) -> dict[str, Any]:
     extractor chose, and how many rows this bill has. Returns NO patient values."""
     tables: list[dict[str, Any]] = []
     with mssql_conn() as conn, conn.cursor() as cur:
-        for table, strategy, head_table in DEPT_TABLES:
+        for table, strategy, head_table in _dept_tables(cur):
             cols = _columns(cur, table)
             entry: dict[str, Any] = {"table": table, "exists": bool(cols), "strategy": strategy}
             if not cols:
