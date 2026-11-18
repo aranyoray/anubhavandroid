@@ -270,6 +270,15 @@ class MyReportsFragment : Fragment() {
 
     private fun renderValues(box: LinearLayout, data: ReportValuesResponse, v: CustomerVisit) {
         box.removeAllViews()
+        // The structured-value extractor only covers some department tables, so a real
+        // report can have a complete PDF yet no parsed parameters. In that case don't
+        // show the green "all normal" chip (nothing was measured here, so that reads as
+        // a false reassurance) — just point to the full report PDF.
+        if (data.reports.isEmpty()) {
+            box.addView(mutedText(R.string.report_values_empty))
+            box.addView(openPdfButton(v))
+            return
+        }
         val abnormal = data.abnormalCount > 0
         box.addView(TextView(requireContext()).apply {
             text = if (abnormal) localized(R.string.report_values_abnormal, data.abnormalCount.toString())
@@ -283,7 +292,6 @@ class MyReportsFragment : Fragment() {
             textSize = 13f
             setTypeface(typeface, Typeface.BOLD)
         })
-        if (data.reports.isEmpty()) box.addView(mutedText(R.string.report_values_empty))
         data.reports.forEachIndexed { i, g -> box.addView(groupAccordion(g, i == 0)) }
         box.addView(openPdfButton(v))
     }

@@ -48,10 +48,14 @@ class ReportPdfDialog : DialogFragment() {
             layoutParams = ViewGroup.LayoutParams(MATCH_PARENT, MATCH_PARENT)
         }
 
-        // Top bar: close (left), title, export (right).
+        // Top bar: close (left), title, export (right). The dialog window draws behind
+        // the status bar / notch, so pad the bar down by the status-bar height — otherwise
+        // the ✕ and title sit under the clock and the notification-shade pull-down.
+        val statusBarH = resources.getIdentifier("status_bar_height", "dimen", "android")
+            .let { if (it > 0) resources.getDimensionPixelSize(it) else dp(24) }
         val bar = LinearLayout(requireContext()).apply {
             orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
-            setBackgroundColor(Color.WHITE); setPadding(dp(8), dp(8), dp(8), dp(8))
+            setBackgroundColor(Color.WHITE); setPadding(dp(8), dp(8) + statusBarH, dp(8), dp(8))
         }
         bar.addView(TextView(requireContext()).apply {
             text = "✕"; textSize = 20f; setTextColor(0xFF1D2939.toInt())

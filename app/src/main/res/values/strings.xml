@@ -196,7 +196,7 @@
     <string name="report_share_failed">No app available to share the PDF</string>
     <string name="report_values_title">Report values</string>
     <string name="report_export_pdf">Export PDF</string>
-    <string name="report_values_empty">Values aren\'t available for this report yet.</string>
+    <string name="report_values_empty">On-screen value breakdown isn\'t available for this report — tap below to open the full report PDF.</string>
     <string name="report_values_abnormal">%1$s value(s) outside the normal range</string>
     <string name="report_values_all_normal">All values within range</string>
     <string name="report_values_ref">Normal range %1$s</string>
@@ -206,7 +206,7 @@
     <string name="report_values_flag_low">Low</string>
     <string name="reports_hide_report">Hide values</string>
     <string name="reports_open_pdf">Open full report PDF</string>
-    <string name="report_values_unavailable">Detailed values aren\'t available — open the PDF instead.</string>
+    <string name="report_values_unavailable">On-screen value breakdown isn\'t available right now — tap below to open the full report PDF.</string>
     <string name="report_share_sheet">Share via WhatsApp, Instagram…</string>
     <string name="error">Error</string>
     <string name="success">Success</string>
@@ -836,7 +836,7 @@ Net ₹%3$s · Received ₹%4$s</string>
     <string name="report_share_failed_bn">পিডিএফ শেয়ার করার কোনো অ্যাপ নেই</string>
     <string name="report_values_title_bn">রিপোর্টের মান</string>
     <string name="report_export_pdf_bn">পিডিএফ এক্সপোর্ট করুন</string>
-    <string name="report_values_empty_bn">এই রিপোর্টের মান এখনও পাওয়া যায়নি।</string>
+    <string name="report_values_empty_bn">এই রিপোর্টের মান স্ক্রিনে দেখানো যাচ্ছে না — নিচে ট্যাপ করে পুরো রিপোর্ট পিডিএফ খুলুন।</string>
     <string name="report_values_abnormal_bn">%1$s টি মান স্বাভাবিক সীমার বাইরে</string>
     <string name="report_values_all_normal_bn">সব মান সীমার মধ্যে</string>
     <string name="report_values_ref_bn">স্বাভাবিক সীমা %1$s</string>
@@ -846,6 +846,6 @@ Net ₹%3$s · Received ₹%4$s</string>
     <string name="report_values_flag_low_bn">কম</string>
     <string name="reports_hide_report_bn">মান লুকান</string>
     <string name="reports_open_pdf_bn">পুরো রিপোর্ট পিডিএফ খুলুন</string>
-    <string name="report_values_unavailable_bn">বিস্তারিত মান পাওয়া যায়নি — পিডিএফ খুলুন।</string>
+    <string name="report_values_unavailable_bn">এই মুহূর্তে মান স্ক্রিনে দেখানো যাচ্ছে না — নিচে ট্যাপ করে পুরো রিপোর্ট পিডিএফ খুলুন।</string>
     <string name="report_share_sheet_bn">হোয়াটসঅ্যাপ, ইনস্টাগ্রামে শেয়ার করুন…</string>
 </resources>
