@@ -336,76 +336,103 @@ class MyReportsFragment : Fragment() {
     }
 
     /**
-     * One parameter: name, flagged result, then the range bar when a reference range came
-     * back. The trend chart is appended later, once the shared history load resolves and
-     * only if this parameter was measured before.
+     * One parameter, as its own card: name, the printed normal range, then the slider with
+     * the result in its pill. Without a numeric range or a numeric result there is nothing
+     * to place on a slider, so the result is written beside the name instead. The trend
+     * chart is appended later, once the shared history load resolves and only if this
+     * parameter was measured before.
      */
     private fun paramRow(p: ReportParam): View {
         val row = LinearLayout(requireContext()).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(0, dp(12), 0, dp(4))
+            background = ContextCompat.getDrawable(requireContext(), R.drawable.report_param_bg)
+            setPadding(dp(14), dp(12), dp(14), dp(12))
+            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(10) }
         }
+        val low = p.low
+        val high = p.high
+        val hasBar = low != null && high != null && high > low
+        val onBar = hasBar && p.value != null
+        val resultText = listOfNotNull(
+            p.result?.takeIf { it.isNotBlank() },
+            p.unit?.takeIf { it.isNotBlank() },
+        ).joinToString(" ")
+        val flagRes = when (p.flag?.uppercase()) {
+            "HIGH" -> R.string.report_values_flag_high
+            "LOW" -> R.string.report_values_flag_low
+            else -> null
+        }
+
         val top = LinearLayout(requireContext()).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
         top.addView(TextView(requireContext()).apply {
             text = p.name
-            textSize = 14f
+            textSize = 15f
+            setTypeface(typeface, Typeface.BOLD)
             setTextColor(color(R.color.text_primary))
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         })
-        val flagColorRes = when (p.flag?.uppercase()) {
-            "HIGH" -> R.color.status_error
-            "LOW" -> R.color.status_pending
-            else -> R.color.status_success
-        }
-        top.addView(TextView(requireContext()).apply {
-            text = listOfNotNull(
-                p.result?.takeIf { it.isNotBlank() },
-                p.unit?.takeIf { it.isNotBlank() },
-            ).joinToString(" ")
-            textSize = 16f
-            setTypeface(typeface, Typeface.BOLD)
-            setTextColor(color(flagColorRes))
-        })
-        // Spelt out as well as coloured, so the flag survives a colour-blind reader.
-        when (p.flag?.uppercase()) {
-            "HIGH" -> R.string.report_values_flag_high
-            "LOW" -> R.string.report_values_flag_low
-            else -> null
-        }?.let { flagRes ->
+        if (!onBar) {
+            val flagColorRes = when (p.flag?.uppercase()) {
+                "HIGH" -> R.color.status_error
+                "LOW" -> R.color.status_pending
+                else -> R.color.status_success
+            }
             top.addView(TextView(requireContext()).apply {
-                text = localized(flagRes).uppercase()
-                textSize = 11f
-                letterSpacing = 0.08f
+                text = resultText
+                textSize = 16f
                 setTypeface(typeface, Typeface.BOLD)
                 setTextColor(color(flagColorRes))
-                layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply { marginStart = dp(8) }
             })
+            // Spelt out as well as coloured, so the flag survives a colour-blind reader.
+            flagRes?.let {
+                top.addView(TextView(requireContext()).apply {
+                    text = localized(it).uppercase()
+                    textSize = 11f
+                    letterSpacing = 0.08f
+                    setTypeface(typeface, Typeface.BOLD)
+                    setTextColor(color(flagColorRes))
+                    layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply { marginStart = dp(8) }
+                })
+            }
         }
         row.addView(top)
 
-        // The red→green bar replaces the old "Ref: 12-16" line whenever we have numbers
-        // to place the marker against; the printed range stays as the caption below it.
-        val low = p.low?.toFloat()
-        val high = p.high?.toFloat()
-        if (low != null && high != null && high > low) {
-            row.addView(RangeBarView(requireContext()).apply {
-                layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(6) }
-                setRange(low, high, p.value?.toFloat())
-            })
-        }
-        p.range?.takeIf { it.isNotBlank() }?.let {
+        rangeLine(p)?.let {
             row.addView(TextView(requireContext()).apply {
                 text = localized(R.string.report_values_ref, it)
-                textSize = 12f
+                textSize = 13f
                 setTextColor(color(R.color.text_secondary))
                 setPadding(0, dp(2), 0, 0)
             })
         }
-        if (p.value != null) attachTrend(row, p, low, high)
+        if (low != null && high != null && hasBar) {
+            row.addView(RangeBarView(requireContext()).apply {
+                layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(10) }
+                // The pill carries the result exactly as the lab printed it when that is a
+                // plain number, so "5.52" is not rounded to "5.5" on its way to the screen.
+                setRange(low, high, p.value, p.result?.trim()?.takeIf { PLAIN_NUMBER.matches(it) })
+                // On the slider, high and low are read off position; say them for TalkBack.
+                contentDescription = listOfNotNull(
+                    resultText.takeIf { it.isNotEmpty() },
+                    flagRes?.let { localized(it) },
+                ).joinToString(", ")
+            })
+        }
+        if (p.value != null) attachTrend(row, p, low?.toFloat(), high?.toFloat())
         return row
+    }
+
+    /** The range as printed on the report with its unit, or built from the two ends. */
+    private fun rangeLine(p: ReportParam): String? {
+        val low = p.low
+        val high = p.high
+        val range = p.range?.trim()?.takeIf { it.isNotEmpty() }
+            ?: if (low != null && high != null) "${RangeBarScale.tick(low)} - ${RangeBarScale.tick(high)}" else return null
+        val unit = p.unit?.trim().orEmpty()
+        return if (unit.isEmpty() || range.contains(unit, ignoreCase = true)) range else "$range $unit"
     }
 
     /**
@@ -631,5 +658,7 @@ class MyReportsFragment : Fragment() {
         const val WRAP = ViewGroup.LayoutParams.WRAP_CONTENT
         /** How many recent visits to chart; each one costs a report-values call. */
         const val TREND_VISITS = 6
+        /** A result that is only a number, so it can go in the slider pill untouched. */
+        val PLAIN_NUMBER = Regex("""-?\d+(\.\d+)?""")
     }
 }

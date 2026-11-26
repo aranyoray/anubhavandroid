@@ -199,7 +199,7 @@
     <string name="report_values_empty">On-screen value breakdown isn\'t available for this report — tap below to open the full report PDF.</string>
     <string name="report_values_abnormal">%1$s value(s) outside the normal range</string>
     <string name="report_values_all_normal">All values within range</string>
-    <string name="report_values_ref">Normal range %1$s</string>
+    <string name="report_values_ref">Normal range: %1$s</string>
     <string name="report_values_trend_show">Trend · %1$d readings</string>
     <string name="report_values_trend_hide">Hide trend</string>
     <string name="report_values_flag_high">High</string>
@@ -839,7 +839,7 @@ Net ₹%3$s · Received ₹%4$s</string>
     <string name="report_values_empty_bn">এই রিপোর্টের মান স্ক্রিনে দেখানো যাচ্ছে না — নিচে ট্যাপ করে পুরো রিপোর্ট পিডিএফ খুলুন।</string>
     <string name="report_values_abnormal_bn">%1$s টি মান স্বাভাবিক সীমার বাইরে</string>
     <string name="report_values_all_normal_bn">সব মান সীমার মধ্যে</string>
-    <string name="report_values_ref_bn">স্বাভাবিক সীমা %1$s</string>
+    <string name="report_values_ref_bn">স্বাভাবিক সীমা: %1$s</string>
     <string name="report_values_trend_show_bn">ট্রেন্ড · %1$dটি ফলাফল</string>
     <string name="report_values_trend_hide_bn">ট্রেন্ড লুকান</string>
     <string name="report_values_flag_high_bn">বেশি</string>
