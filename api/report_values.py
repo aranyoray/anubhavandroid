@@ -2,18 +2,23 @@
 
 Reads the LIVE AKTIV MSSQL per-department result tables (CHEMICAL_DTLS,
 HAEMATOLOGY_DTLS, HORMONE_DTLS, SEROLOGY_DTLS, …). These are NOT mirrored to
-Neon, so this needs the clinic PC to be up. Each *_DTLS row is one analyte with
-its result, unit and reference range (snapshotted at report time). There is no
-stored high/low flag — we compute it by parsing RESULT against the low/high range.
+Neon, so this needs the clinic PC to be up. There is no stored high/low flag —
+we compute it by parsing RESULT against the low/high range.
 
-Two keying strategies per the AKTIV schema:
-  - bill_key   : the *_DTLS table has a BILL_KEY column (chemistry, haematology,
-                 hormone, urine, fluids).
-  - report_key : the *_DTLS table has only REPORT_KEY; join its *_HEAD (which
-                 carries BILL_KEY) on REPORT_KEY (serology, micro, mantoux, …).
-Column names vary across AKTIV installs, so the exact result/parameter/unit/
-range columns are discovered from INFORMATION_SCHEMA rather than hard-coded —
-a table keyed or named differently is skipped, not fatal.
+How the rows really hang together (verified against the clinic DB, Nov 2026):
+  - A bill's reports are found through ``<DEPT>_HEAD.BILL_KEY``; the detail rows
+    join on ``REPORT_KEY``. ``<DEPT>_DTLS.BILL_KEY`` exists as a column but is
+    NULL on every row, so filtering the detail table by it returns nothing —
+    that was the "PDF opens but no values on screen" bug.
+  - ``REPORT_KEY`` is numbered per department, so it must never be matched
+    across tables; authorisation is read from the department's own
+    ``<DEPT>_HEAD.CONFIRM_REPORT``.
+  - ``<DEPT>_DTLS.PARAMETER`` is the *method* line ("Method : GOD-POD"). The
+    analyte name is ``MAST_DESCRIPTION.DESCRIPTION`` via ``DESCRIPTION_KEY``.
+  - Rows with no result are layout rows (panel headings, spacers) and are skipped.
+
+Table and column names are discovered from INFORMATION_SCHEMA rather than
+hard-coded, so a department table shaped differently is skipped, not fatal.
 """
 from __future__ import annotations
 
@@ -21,23 +26,6 @@ import re
 from typing import Any
 
 from db import fetch_all, mssql_conn
-
-# (dtls_table, strategy, head_table). strategy "bill_key" filters d.BILL_KEY;
-# "report_key" joins head_table h ON h.REPORT_KEY = d.REPORT_KEY, filters h.BILL_KEY.
-DEPT_TABLES: list[tuple[str, str, str | None]] = [
-    ("CHEMICAL_DTLS", "bill_key", None),
-    ("HAEMATOLOGY_DTLS", "bill_key", None),
-    ("HORMONE_DTLS", "bill_key", None),
-    ("IMMUNOLOGY_DTLS", "bill_key", None),
-    ("URINE_DTLS", "bill_key", None),
-    ("URINALYSIS_DTLS", "bill_key", None),
-    ("BODYFLUID_DTLS", "bill_key", None),
-    ("FLUID_DTLS", "bill_key", None),
-    ("SEROLOGY_DTLS", "report_key", "SEROLOGY_HEAD"),
-    ("MICRO_DTLS", "report_key", "MICRO_HEAD"),
-    ("MANTOUX_DTLS", "report_key", "MANTOUX_HEAD"),
-    ("CYTOLOGY_DTLS", "report_key", "CYTOLOGY_HEAD"),
-]
 
 # Candidate column names (first match wins), matched case-insensitively.
 PARAM_COLS = ["PARAMETER", "TESTNAME", "TEST_NAME", "PARTICULARS", "INVESTIGATION", "ANALYTE", "NAME"]
@@ -47,7 +35,14 @@ RANGE_COLS = ["NORMALRANGE", "NORMAL_RANGE", "BIOREFRANGE", "REFRANGE", "REF_RAN
 LOW_COLS = ["LOWER_RANGE", "LOWRANGE", "LOW_RANGE", "MIN_RANGE", "MINVALUE", "MIN_VALUE", "L_RANGE"]
 HIGH_COLS = ["UPPER_RANGE", "HIGHRANGE", "HIGH_RANGE", "MAX_RANGE", "MAXVALUE", "MAX_VALUE", "H_RANGE"]
 
+DESC_TABLE = "MAST_DESCRIPTION"
+
 _NUM = re.compile(r"-?\d+(?:\.\d+)?")
+_METHOD_PREFIX = re.compile(r"^\s*method\s*[:\-]*\s*", re.IGNORECASE)
+
+# UPPER table name -> {UPPER column name -> real column name}. The schema does not
+# change while the server runs, so it is read once (and re-read if it came back empty).
+_schema_cache: dict[str, dict[str, str]] = {}
 
 
 def _num(value: Any) -> float | None:
@@ -73,17 +68,8 @@ def _flag(result: Any, low: float | None, high: float | None) -> str:
     return "NORMAL"
 
 
-def _columns(cur, table: str) -> dict[str, str]:
-    """UPPER-name -> real column name for a table, or {} if the table is absent."""
-    try:
-        rows = fetch_all(
-            cur,
-            "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = %s",
-            (table,),
-        )
-    except Exception:
-        return {}
-    return {(r["COLUMN_NAME"] or "").upper(): r["COLUMN_NAME"] for r in rows}
+def _as_str(value: Any) -> str:
+    return str(value).strip() if value is not None else ""
 
 
 def _pick(cols: dict[str, str], candidates: list[str]) -> str | None:
@@ -93,49 +79,132 @@ def _pick(cols: dict[str, str], candidates: list[str]) -> str | None:
     return None
 
 
-def _list_tables(cur) -> set[str]:
-    """Every base table name present, UPPER-cased."""
+def _schema(cur) -> dict[str, dict[str, str]]:
+    """Columns of every ``*_DTLS`` / ``*_HEAD`` table plus MAST_DESCRIPTION, in one query."""
+    if _schema_cache:
+        return _schema_cache
     try:
         rows = fetch_all(
             cur,
-            "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE'",
+            "SELECT c.TABLE_NAME, c.COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS c "
+            "INNER JOIN INFORMATION_SCHEMA.TABLES t ON t.TABLE_NAME = c.TABLE_NAME "
+            "AND t.TABLE_SCHEMA = c.TABLE_SCHEMA "
+            "WHERE t.TABLE_TYPE = 'BASE TABLE' AND (c.TABLE_NAME LIKE '%[_]DTLS' "
+            "OR c.TABLE_NAME LIKE '%[_]HEAD' OR c.TABLE_NAME = %s)",
+            (DESC_TABLE,),
         )
     except Exception:
-        return set()
-    return {(r["TABLE_NAME"] or "").upper() for r in rows}
+        return {}
+    schema: dict[str, dict[str, str]] = {}
+    for r in rows:
+        table, col = r["TABLE_NAME"] or "", r["COLUMN_NAME"] or ""
+        schema.setdefault(table.upper(), {})[col.upper()] = col
+    _schema_cache.update(schema)
+    return schema
 
 
-def _dept_tables(cur) -> list[tuple[str, str, str | None]]:
-    """The hardcoded department tables, plus every other ``*_DTLS`` table actually present.
+def _sources(cur) -> list[dict[str, Any]]:
+    """One entry per department result table, with the SQL to read a bill's rows from it.
 
-    AKTIV installs name their result tables differently (CHEMISTRY_DTLS vs CHEMICAL_DTLS,
-    extra panels, renamed heads), so the fixed list silently returns nothing on a schema it
-    does not match - which is exactly a report with a full PDF but no on-screen values.
-    Discover the real tables instead: any ``*_DTLS`` carrying a parameter column, filtered
-    by BILL_KEY when it has one, else joined through its matching ``*_HEAD``.
+    A result table is any ``*_DTLS`` with REPORT_KEY, a parameter column and a result
+    column. Its rows are tied to the bill through the matching ``*_HEAD`` (preferred —
+    that is where AKTIV actually stores BILL_KEY); only when there is no usable head do
+    we fall back to a BILL_KEY column on the detail table itself.
     """
-    tables = list(DEPT_TABLES)
-    known = {t[0].upper() for t in tables}
-    present = _list_tables(cur)
-    for name in sorted(present):
-        if not name.endswith("_DTLS") or name in known:
+    schema = _schema(cur)
+    desc_cols = schema.get(DESC_TABLE, {})
+    sources: list[dict[str, Any]] = []
+    for table in sorted(schema):
+        if not table.endswith("_DTLS"):
             continue
-        cols = _columns(cur, name)
-        if not _pick(cols, PARAM_COLS):
+        cols = schema[table]
+        rk_c = cols.get("REPORT_KEY")
+        param_c = _pick(cols, PARAM_COLS)
+        result_c = _pick(cols, RESULT_COLS)
+        if not (rk_c and param_c and result_c):
             continue
-        if "BILL_KEY" in cols:
-            tables.append((name, "bill_key", None))
-        elif "REPORT_KEY" in cols:
-            head = name[:-5] + "_HEAD"
-            if head in present:
-                hcols = _columns(cur, head)
-                if "BILL_KEY" in hcols and "REPORT_KEY" in hcols:
-                    tables.append((name, "report_key", head))
-    return tables
+
+        head = table[:-5] + "_HEAD"
+        hcols = schema.get(head, {})
+        if "BILL_KEY" in hcols and "REPORT_KEY" in hcols:
+            strategy = "head"
+            frm = f"FROM [{table}] d INNER JOIN [{head}] h ON h.[{hcols['REPORT_KEY']}] = d.[{rk_c}]"
+            where = f"WHERE h.[{hcols['BILL_KEY']}] = %s"
+            confirm = f"h.[{hcols['CONFIRM_REPORT']}]" if "CONFIRM_REPORT" in hcols else "NULL"
+        elif "BILL_KEY" in cols:
+            strategy, head = "bill_key", None
+            frm = f"FROM [{table}] d"
+            where = f"WHERE d.[{cols['BILL_KEY']}] = %s"
+            confirm = "NULL"
+        else:
+            continue
+
+        def dcol(name: str | None) -> str:
+            return f"d.[{name}]" if name else "NULL"
+
+        dk_c = cols.get("DESCRIPTION_KEY")
+        use_desc = bool(dk_c and "DESCRIPTION_KEY" in desc_cols and "DESCRIPTION" in desc_cols)
+        join = (
+            f"LEFT JOIN [{DESC_TABLE}] m ON m.[{desc_cols['DESCRIPTION_KEY']}] = d.[{dk_c}]"
+            if use_desc
+            else ""
+        )
+        order_c = cols.get("REPORT_DTLS_KEY")
+        select = ", ".join(
+            [
+                f"d.[{rk_c}] AS report_key",
+                (f"m.[{desc_cols['DESCRIPTION']}] AS analyte" if use_desc else "NULL AS analyte"),
+                f"d.[{param_c}] AS parameter",
+                f"d.[{result_c}] AS result",
+                f"{dcol(_pick(cols, UNIT_COLS))} AS unit",
+                f"{dcol(_pick(cols, RANGE_COLS))} AS range_text",
+                f"{dcol(_pick(cols, LOW_COLS))} AS low",
+                f"{dcol(_pick(cols, HIGH_COLS))} AS high",
+                f"{confirm} AS confirmed",
+            ]
+        )
+        order = f"ORDER BY d.[{rk_c}]" + (f", d.[{order_c}]" if order_c else "")
+        sources.append(
+            {
+                "table": table,
+                "head": head,
+                "strategy": strategy,
+                "sql": f"SELECT {select} {frm} {join} {where} {order}",
+                "count_sql": f"SELECT COUNT_BIG(*) AS n {frm} {where}",
+            }
+        )
+    return sources
 
 
-def _as_str(value: Any) -> str:
-    return str(value).strip() if value is not None else ""
+def _test_names(cur, bill_key: int) -> dict[Any, str]:
+    """report_key -> billed test name(s), for labelling a report section.
+
+    REPORT_KEY repeats across departments, so a key that two of this bill's departments
+    share is left unlabelled rather than guessed.
+    """
+    try:
+        rows = fetch_all(
+            cur,
+            "SELECT b.report_key, b.category_key, RTRIM(ISNULL(t.testname,'')) AS test_name "
+            "FROM BILL_TEST_DTLS b LEFT JOIN MAST_TEST t ON t.test_key = b.test_key "
+            "WHERE b.bill_key = %s AND ISNULL(b.report_key,0) > 0 ORDER BY b.BILL_TEST_DTLS_KEY",
+            (bill_key,),
+        )
+    except Exception:
+        return {}
+    names: dict[Any, list[str]] = {}
+    cats: dict[Any, set] = {}
+    for r in rows:
+        rk = r["report_key"]
+        cats.setdefault(rk, set()).add(r["category_key"])
+        name = (r["test_name"] or "").strip()
+        if name and name not in names.setdefault(rk, []):
+            names[rk].append(name)
+    return {rk: ", ".join(v) for rk, v in names.items() if len(cats.get(rk, ())) == 1}
+
+
+def _is_blank_result(result: str) -> bool:
+    return not result.strip(" .-_")
 
 
 def report_values(*, bill_key: int, phone: str | None = None) -> dict[str, Any]:
@@ -154,132 +223,72 @@ def report_values(*, bill_key: int, phone: str | None = None) -> dict[str, Any]:
         if phone and _norm_phone(h["phone"]) != _norm_phone(phone):
             raise PermissionError("bill does not belong to this phone")
 
-        confirmed_rows = fetch_all(
-            cur,
-            "SELECT DISTINCT report_key FROM BILL_TEST_DTLS "
-            "WHERE bill_key = %s AND ISNULL(report_key,0) > 0 "
-            "AND CONVERT(varchar(4), confirm_report) = '1'",
-            (bill_key,),
-        )
-        confirmed = {r["report_key"] for r in confirmed_rows}
-
+        test_names = _test_names(cur, bill_key)
         by_report: dict[tuple, list[dict]] = {}
-        for table, strategy, head_table in _dept_tables(cur):
-            cols = _columns(cur, table)
-            if not cols:
-                continue
-            param_c = _pick(cols, PARAM_COLS)
-            if not param_c:
-                continue  # nothing to label a row with
-            result_c = _pick(cols, RESULT_COLS)
-            unit_c = _pick(cols, UNIT_COLS)
-            range_c = _pick(cols, RANGE_COLS)
-            low_c = _pick(cols, LOW_COLS)
-            high_c = _pick(cols, HIGH_COLS)
-            rk_c = cols.get("REPORT_KEY")
-            tk_c = cols.get("TEST_KEY")
-
-            def dcol(name: str | None) -> str:
-                return f"d.[{name}]" if name else "NULL"
-
-            select = [
-                f"{dcol(rk_c)} AS report_key",
-                f"d.[{param_c}] AS parameter",
-                f"{dcol(result_c)} AS result",
-                f"{dcol(unit_c)} AS unit",
-                f"{dcol(range_c)} AS range_text",
-                f"{dcol(low_c)} AS low",
-                f"{dcol(high_c)} AS high",
-                ("RTRIM(ISNULL(t.testname,'')) AS test_name" if tk_c else "'' AS test_name"),
-            ]
-            join = f"LEFT JOIN MAST_TEST t ON t.test_key = d.[{tk_c}]" if tk_c else ""
-
-            if strategy == "bill_key" and "BILL_KEY" in cols:
-                sql = f"SELECT {', '.join(select)} FROM {table} d {join} WHERE d.[{cols['BILL_KEY']}] = %s"
-            elif strategy == "report_key" and rk_c and head_table:
-                sql = (
-                    f"SELECT {', '.join(select)} FROM {table} d "
-                    f"INNER JOIN {head_table} h ON h.REPORT_KEY = d.[{rk_c}] {join} "
-                    f"WHERE h.BILL_KEY = %s"
-                )
-            elif "BILL_KEY" in cols:  # some installs add BILL_KEY to report_key tables
-                sql = f"SELECT {', '.join(select)} FROM {table} d {join} WHERE d.[{cols['BILL_KEY']}] = %s"
-            else:
-                continue
-
+        for src in _sources(cur):
             try:
-                rows = fetch_all(cur, sql, (bill_key,))
+                rows = fetch_all(cur, src["sql"], (bill_key,))
             except Exception:
-                continue
+                continue  # one oddly-shaped department must not blank the whole report
 
             for r in rows:
-                rk = r["report_key"]
-                # When the department links reports, only show authorised ones.
-                if confirmed and rk is not None and rk not in confirmed:
+                # Only authorised reports, judged by the department's own head row.
+                if src["strategy"] == "head" and _as_str(r["confirmed"]) != "1":
                     continue
-                name = (r["parameter"] or "").strip()
+                result = _as_str(r["result"])
+                if _is_blank_result(result):
+                    continue  # panel heading / spacer row
+                method = _as_str(r["parameter"])
+                name = _as_str(r["analyte"]) or method
                 if not name:
                     continue
                 low, high = _num(r["low"]), _num(r["high"])
-                by_report.setdefault((table, rk, (r["test_name"] or "").strip()), []).append(
+                rk = r["report_key"]
+                by_report.setdefault((src["table"], rk), []).append(
                     {
                         "name": name,
-                        "result": _as_str(r["result"]),
+                        "method": _METHOD_PREFIX.sub("", method) if _as_str(r["analyte"]) else "",
+                        "result": result,
                         "unit": _as_str(r["unit"]),
                         "range": _as_str(r["range_text"]),
                         "low": low,
                         "high": high,
-                        "value": _num(r["result"]),
-                        "flag": _flag(r["result"], low, high),
+                        "value": _num(result),
+                        "flag": _flag(result, low, high),
                     }
                 )
 
+    single_dept = len({table for table, _ in by_report}) == 1
     reports = [
-        {"category": table.replace("_DTLS", ""), "report_key": rk, "test_name": test_name, "parameters": params}
-        for (table, rk, test_name), params in by_report.items()
+        {
+            "category": table[:-5],
+            "report_key": rk,
+            # With several departments a shared REPORT_KEY could mislabel; names are
+            # already dropped for keys the bill uses in more than one category.
+            "test_name": test_names.get(rk, "") if (single_dept or rk in test_names) else "",
+            "parameters": params,
+        }
+        for (table, rk), params in by_report.items()
         if params
     ]
     return _envelope(h, reports)
 
 
 def report_values_debug(*, bill_key: int) -> dict[str, Any]:
-    """Coverage diagnostic: per department table, whether it exists, the columns the
-    extractor chose, and how many rows this bill has. Returns NO patient values."""
+    """Coverage diagnostic: per department table, how it is tied to the bill and how
+    many rows this bill has in it. Returns NO patient values."""
     tables: list[dict[str, Any]] = []
     with mssql_conn() as conn, conn.cursor() as cur:
-        for table, strategy, head_table in _dept_tables(cur):
-            cols = _columns(cur, table)
-            entry: dict[str, Any] = {"table": table, "exists": bool(cols), "strategy": strategy}
-            if not cols:
-                tables.append(entry)
-                continue
-            chosen = {
-                "parameter": _pick(cols, PARAM_COLS),
-                "result": _pick(cols, RESULT_COLS),
-                "unit": _pick(cols, UNIT_COLS),
-                "range": _pick(cols, RANGE_COLS),
-                "low": _pick(cols, LOW_COLS),
-                "high": _pick(cols, HIGH_COLS),
-                "report_key": cols.get("REPORT_KEY"),
-                "test_key": cols.get("TEST_KEY"),
-                "bill_key": cols.get("BILL_KEY"),
+        for src in _sources(cur):
+            entry: dict[str, Any] = {
+                "table": src["table"],
+                "exists": True,
+                "strategy": src["strategy"],
+                "head": src["head"],
             }
-            entry["columns"] = chosen
             try:
-                if strategy == "bill_key" and "BILL_KEY" in cols:
-                    r = fetch_all(cur, f"SELECT COUNT_BIG(*) AS n FROM {table} d WHERE d.[{cols['BILL_KEY']}] = %s", (bill_key,))
-                elif strategy == "report_key" and chosen["report_key"] and head_table:
-                    r = fetch_all(
-                        cur,
-                        f"SELECT COUNT_BIG(*) AS n FROM {table} d "
-                        f"INNER JOIN {head_table} h ON h.REPORT_KEY = d.[{chosen['report_key']}] WHERE h.BILL_KEY = %s",
-                        (bill_key,),
-                    )
-                elif "BILL_KEY" in cols:
-                    r = fetch_all(cur, f"SELECT COUNT_BIG(*) AS n FROM {table} d WHERE d.[{cols['BILL_KEY']}] = %s", (bill_key,))
-                else:
-                    r = [{"n": None}]
-                entry["row_count"] = r[0]["n"] if r else 0
+                r = fetch_all(cur, src["count_sql"], (bill_key,))
+                entry["row_count"] = int(r[0]["n"]) if r else 0
             except Exception as exc:  # noqa: BLE001 — surface the DB message for debugging
                 entry["error"] = str(exc)[:200]
             tables.append(entry)
